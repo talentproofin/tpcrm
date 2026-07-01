@@ -1,10 +1,7 @@
 "use client";
 
 import { ShieldAlert } from "lucide-react";
-import {
-  DASHBOARD_VARIANTS,
-  resolveDashboardVariant,
-} from "../constants/roles";
+import { DASHBOARD_VARIANTS, resolveDashboardVariant } from "../constants/roles";
 import { useDashboardIdentity } from "../hooks/useDashboardIdentity";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { ErrorState } from "@/components/feedback/ErrorState";

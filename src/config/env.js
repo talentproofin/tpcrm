@@ -45,4 +45,15 @@ export function getSupabaseConfig() {
   };
 }
 
+/**
+ * Returns the Supabase service role key for server-only admin operations.
+ * @returns {string}
+ */
+export function getSupabaseServiceRoleKey() {
+  return requireEnv(
+    SUPABASE_ENV_KEYS.SERVICE_ROLE_KEY,
+    process.env[SUPABASE_ENV_KEYS.SERVICE_ROLE_KEY]
+  );
+}
+
 export { LOG_LEVELS };

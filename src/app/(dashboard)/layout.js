@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { FOLLOWUP_ROUTES } from "@/features/followups/constants/routes";
-import { LEAD_ROUTES } from "@/features/leads/constants/routes";
-import { REPORT_ROUTES } from "@/features/reports/constants/routes";
+import { DashboardNav } from "@/features/dashboard/components/DashboardNav";
 
 export default function DashboardLayout({ children }) {
   return (
@@ -12,32 +10,7 @@ export default function DashboardLayout({ children }) {
             <Link href="/dashboard" className="text-sm font-semibold tracking-tight">
               TalentProof CRM
             </Link>
-            <nav className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground sm:gap-4">
-              <Link
-                href={FOLLOWUP_ROUTES.WORKSPACE}
-                className="transition-colors hover:text-foreground"
-              >
-                Follow-ups
-              </Link>
-              <Link
-                href={LEAD_ROUTES.LIST}
-                className="transition-colors hover:text-foreground"
-              >
-                Leads
-              </Link>
-              <Link
-                href="/dashboard"
-                className="transition-colors hover:text-foreground"
-              >
-                Dashboard
-              </Link>
-              <Link
-                href={REPORT_ROUTES.DAILY}
-                className="transition-colors hover:text-foreground"
-              >
-                Daily Report
-              </Link>
-            </nav>
+            <DashboardNav />
           </div>
         </div>
       </header>
