@@ -1,0 +1,48 @@
+import { APP_ENV_KEYS } from "@/constants/app";
+import { SUPABASE_ENV_KEYS } from "@/constants/supabase";
+import {
+  DEFAULT_LOG_LEVEL,
+  LOG_LEVELS,
+} from "@/constants/logging";
+import { isValidLogLevel, optionalEnv, requireEnv } from "./validateEnv";
+
+/**
+ * Application environment configuration.
+ * Supabase vars are validated only when getSupabaseConfig() is called.
+ */
+export const env = {
+  appUrl: optionalEnv(
+    process.env[APP_ENV_KEYS.APP_URL],
+    "http://localhost:3000"
+  ),
+  nodeEnv: optionalEnv(process.env[APP_ENV_KEYS.NODE_ENV], "development"),
+  logLevel: (() => {
+    const level = optionalEnv(
+      process.env[APP_ENV_KEYS.LOG_LEVEL],
+      DEFAULT_LOG_LEVEL
+    );
+    return isValidLogLevel(level) ? level : DEFAULT_LOG_LEVEL;
+  })(),
+  isDevelopment: process.env.NODE_ENV === "development",
+  isProduction: process.env.NODE_ENV === "production",
+};
+
+/**
+ * Returns validated Supabase configuration.
+ * Call this when creating a Supabase client — not at module import time.
+ * @returns {{ url: string, anonKey: string }}
+ */
+export function getSupabaseConfig() {
+  return {
+    url: requireEnv(
+      SUPABASE_ENV_KEYS.URL,
+      process.env[SUPABASE_ENV_KEYS.URL]
+    ),
+    anonKey: requireEnv(
+      SUPABASE_ENV_KEYS.ANON_KEY,
+      process.env[SUPABASE_ENV_KEYS.ANON_KEY]
+    ),
+  };
+}
+
+export { LOG_LEVELS };
