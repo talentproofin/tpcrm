@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MIN_PASSWORD_LENGTH } from "@/features/auth/constants/validation";
 import { USER_STATUS_CODES } from "../constants";
 
 const optionalText = (max, label) =>
@@ -36,7 +37,18 @@ export const userCreateSchema = z.object({
   roleId: z.string().uuid("Select a role."),
   managerProfileId: managerProfileIdSchema,
   phone: optionalText(50, "Phone"),
-});
+  password: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal("")),
+}).refine(
+  (data) => !data.password || data.password.length >= MIN_PASSWORD_LENGTH,
+  {
+    message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+    path: ["password"],
+  }
+);
 
 export const userUpdateSchema = z.object({
   fullName: z
@@ -57,6 +69,7 @@ export const userCreateDefaultValues = {
   roleId: "",
   managerProfileId: "",
   phone: "",
+  password: "",
 };
 
 /** @type {import('zod').infer<typeof userUpdateSchema>} */

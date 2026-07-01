@@ -38,17 +38,21 @@ export const env = {
 /**
  * Returns validated Supabase configuration.
  * Call this when creating a Supabase client — not at module import time.
+ *
+ * NEXT_PUBLIC_* values must use static `process.env.NEXT_PUBLIC_...` access
+ * so Next.js can inline them in client bundles.
+ *
  * @returns {{ url: string, anonKey: string }}
  */
 export function getSupabaseConfig() {
   return {
     url: requireEnv(
       SUPABASE_ENV_KEYS.URL,
-      process.env[SUPABASE_ENV_KEYS.URL]
+      process.env.NEXT_PUBLIC_SUPABASE_URL
     ),
     anonKey: requireEnv(
       SUPABASE_ENV_KEYS.ANON_KEY,
-      process.env[SUPABASE_ENV_KEYS.ANON_KEY]
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     ),
   };
 }

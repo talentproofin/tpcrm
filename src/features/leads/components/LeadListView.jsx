@@ -12,9 +12,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { getAuthBrowserClient } from "@/features/auth/services/authClient";
 import { getLeadStages, getLeadTypes } from "@/services/lookups/lookupService";
-import { DEFAULT_PAGE_SIZE } from "../constants/list";
+import { DEFAULT_PAGE_SIZE, SEARCH_DEBOUNCE_MS } from "../constants/list";
 import { LEAD_ROUTES } from "../constants/routes";
 import { getAssignableProfiles, getLeadList } from "../services/leadService";
 import { ErrorState } from "@/components/feedback/ErrorState";
@@ -25,7 +26,8 @@ import { PaginationControls } from "./PaginationControls";
 export function LeadListView() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS);
   const [stageId, setStageId] = useState("");
   const [leadTypeId, setLeadTypeId] = useState("");
   const [ownerProfileId, setOwnerProfileId] = useState("");
@@ -46,7 +48,7 @@ export function LeadListView() {
     const { data, error: listError } = await getLeadList(supabase, {
       page,
       pageSize: DEFAULT_PAGE_SIZE,
-      search,
+      search: debouncedSearch,
       stageId: stageId || undefined,
       leadTypeId: leadTypeId || undefined,
       ownerProfileId: ownerProfileId || undefined,
@@ -61,7 +63,7 @@ export function LeadListView() {
     }
 
     setLoading(false);
-  }, [page, search, stageId, leadTypeId, ownerProfileId, includeTrashed]);
+  }, [page, debouncedSearch, stageId, leadTypeId, ownerProfileId, includeTrashed]);
 
   useEffect(() => {
     const stageParam = searchParams.get("stageId");
@@ -102,19 +104,15 @@ export function LeadListView() {
   }, []);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      loadLeads();
-    }, 250);
-
-    return () => clearTimeout(timeout);
+    loadLeads();
   }, [loadLeads]);
 
   useEffect(() => {
     setPage(1);
-  }, [search, stageId, leadTypeId, ownerProfileId, includeTrashed]);
+  }, [debouncedSearch, stageId, leadTypeId, ownerProfileId, includeTrashed]);
 
   const hasActiveFilters = Boolean(
-    search || stageId || leadTypeId || ownerProfileId || includeTrashed
+    debouncedSearch || stageId || leadTypeId || ownerProfileId || includeTrashed
   );
 
   return (
@@ -143,7 +141,7 @@ export function LeadListView() {
         </CardHeader>
         <CardContent>
           <LeadFilters
-            search={search}
+            search={searchInput}
             stageId={stageId}
             leadTypeId={leadTypeId}
             ownerProfileId={ownerProfileId}
@@ -151,12 +149,12 @@ export function LeadListView() {
             stages={stages}
             leadTypes={leadTypes}
             profiles={profiles}
-            onSearchChange={setSearch}
+            onSearchChange={setSearchInput}
             onStageChange={setStageId}
             onLeadTypeChange={setLeadTypeId}
             onOwnerChange={setOwnerProfileId}
             onIncludeTrashedChange={setIncludeTrashed}
-            disabled={loading}
+            disableFilters={loading}
           />
         </CardContent>
       </Card>

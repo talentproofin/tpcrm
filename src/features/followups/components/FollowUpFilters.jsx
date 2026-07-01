@@ -26,7 +26,7 @@ import { FOLLOWUP_VIEW_OPTIONS } from "../constants/routes";
  *   onAssignedToProfileIdChange: (value: string) => void,
  *   onLeadTypeChange: (value: string) => void,
  *   onStageChange: (value: string) => void,
- *   disabled?: boolean,
+ *   disableFilters?: boolean,
  * }} props
  */
 export function FollowUpFilters({
@@ -45,7 +45,7 @@ export function FollowUpFilters({
   onAssignedToProfileIdChange,
   onLeadTypeChange,
   onStageChange,
-  disabled = false,
+  disableFilters = false,
 }) {
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -56,7 +56,6 @@ export function FollowUpFilters({
           placeholder="Organization or primary contact..."
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
-          disabled={disabled}
         />
       </div>
 
@@ -65,7 +64,7 @@ export function FollowUpFilters({
         <Select
           value={view}
           onValueChange={onViewChange}
-          disabled={disabled}
+          disabled={disableFilters}
         >
           <SelectTrigger>
             <SelectValue placeholder="All open" />
@@ -87,7 +86,7 @@ export function FollowUpFilters({
           onValueChange={(value) =>
             onStageChange(value === "__all__" ? "" : value)
           }
-          disabled={disabled}
+          disabled={disableFilters}
         >
           <SelectTrigger>
             <SelectValue placeholder="All stages" />
@@ -110,7 +109,7 @@ export function FollowUpFilters({
           onValueChange={(value) =>
             onLeadTypeChange(value === "__all__" ? "" : value)
           }
-          disabled={disabled}
+          disabled={disableFilters}
         >
           <SelectTrigger>
             <SelectValue placeholder="All types" />
@@ -134,7 +133,7 @@ export function FollowUpFilters({
             onAssignedToProfileIdChange(value === "__all__" ? "" : value);
             onAssignedToMeChange(false);
           }}
-          disabled={disabled || assignedToMe}
+          disabled={disableFilters || assignedToMe}
         >
           <SelectTrigger>
             <SelectValue placeholder="All executives" />
@@ -157,7 +156,7 @@ export function FollowUpFilters({
             className="h-4 w-4 rounded border border-input"
             checked={assignedToMe}
             onChange={(event) => onAssignedToMeChange(event.target.checked)}
-            disabled={disabled}
+            disabled={disableFilters}
           />
           Assigned to me
         </label>

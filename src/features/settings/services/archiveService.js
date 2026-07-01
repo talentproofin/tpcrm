@@ -62,7 +62,7 @@ async function fetchArchivedContacts(supabase, options = {}) {
   const { data, error, count } = await supabase
     .from("contacts")
     .select(
-      "id, full_name, email, phone, archived_at, lead_id, is_primary",
+      "id, full_name, email, mobile_number, archived_at, lead_id, is_primary",
       { count: "exact" }
     )
     .not("archived_at", "is", null)
@@ -78,7 +78,7 @@ async function fetchArchivedContacts(supabase, options = {}) {
     id: String(row.id),
     fullName: String(row.full_name ?? ""),
     email: row.email ? String(row.email) : null,
-    phone: row.phone ? String(row.phone) : null,
+    mobileNumber: row.mobile_number ? String(row.mobile_number) : null,
     archivedAt: row.archived_at ? String(row.archived_at) : null,
     leadId: row.lead_id ? String(row.lead_id) : null,
     isPrimary: Boolean(row.is_primary),

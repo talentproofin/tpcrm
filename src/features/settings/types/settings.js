@@ -41,7 +41,7 @@
  * @property {string} id
  * @property {string} fullName
  * @property {string | null} email
- * @property {string | null} phone
+ * @property {string | null} mobileNumber
  * @property {string | null} archivedAt
  * @property {string | null} leadId
  * @property {boolean} isPrimary

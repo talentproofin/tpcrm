@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { DashboardNav } from "@/features/dashboard/components/DashboardNav";
+import { DashboardUserMenu } from "@/features/dashboard/components/DashboardUserMenu";
 
 export default function DashboardLayout({ children }) {
   return (
@@ -12,6 +13,7 @@ export default function DashboardLayout({ children }) {
             </Link>
             <DashboardNav />
           </div>
+          <DashboardUserMenu />
         </div>
       </header>
       <main className="mx-auto min-w-0 max-w-6xl p-6 sm:p-8">{children}</main>

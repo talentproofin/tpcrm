@@ -26,6 +26,7 @@ import {
 import { getUserList } from "../services/userService";
 import { UserFilters } from "./UserFilters";
 import { UserFormDialog } from "./UserFormDialog";
+import { SetUserPasswordDialog } from "./SetUserPasswordDialog";
 import { UserStatsSummary } from "./UserStatsSummary";
 import { UserTable } from "./UserTable";
 
@@ -63,6 +64,8 @@ export function UserListView() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [formMode, setFormMode] = useState("create");
   const [formOpen, setFormOpen] = useState(false);
+  const [passwordUser, setPasswordUser] = useState(null);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [actionProfileId, setActionProfileId] = useState(null);
 
   const canAccess = canAccessUserManagement(roleCode);
@@ -170,6 +173,11 @@ export function UserListView() {
     setSelectedUser(user);
     setFormMode("edit");
     setFormOpen(true);
+  }
+
+  function openSetPassword(user) {
+    setPasswordUser(user);
+    setPasswordDialogOpen(true);
   }
 
   async function handleResendInvite(user) {
@@ -285,9 +293,11 @@ export function UserListView() {
                 users={listResult?.items ?? []}
                 canManage={canManage}
                 onEdit={openEdit}
+                onSetPassword={openSetPassword}
                 onResendInvite={handleResendInvite}
                 onSendRecovery={handleSendRecovery}
                 actionProfileId={actionProfileId}
+                currentProfileId={profile?.profileId ?? null}
               />
               {listResult ? (
                 <PaginationControls
@@ -312,10 +322,25 @@ export function UserListView() {
           onSaved={() => {
             toast.success(
               formMode === "create"
-                ? "User created and invite email sent."
+                ? "User created successfully."
                 : "User updated."
             );
             loadUsers();
+          }}
+        />
+      ) : null}
+
+      {canManage ? (
+        <SetUserPasswordDialog
+          user={passwordUser}
+          open={passwordDialogOpen}
+          onOpenChange={setPasswordDialogOpen}
+          onSaved={() => {
+            toast.success(
+              passwordUser
+                ? `Password updated for ${passwordUser.email}.`
+                : "Password updated."
+            );
           }}
         />
       ) : null}

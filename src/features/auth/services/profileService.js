@@ -100,12 +100,10 @@ export async function getRoleById(supabase, roleId) {
  * @param {string} authUserId
  * @returns {Promise<void>}
  */
-export async function updateLastLoginAt(supabase, profileId, authUserId) {
-  const { error } = await supabase
-    .from("profiles")
-    .update({ last_login_at: new Date().toISOString() })
-    .eq("profile_id", profileId)
-    .eq("auth_user_id", authUserId);
+export async function updateLastLoginAt(supabase, profileId) {
+  const { error } = await supabase.rpc("update_last_login_at", {
+    p_profile_id: profileId,
+  });
 
   if (error) {
     throw createAuthError(

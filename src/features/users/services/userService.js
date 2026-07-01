@@ -4,7 +4,7 @@ import {
   MANAGER_ASSIGNABLE_ROLE_CODES,
   USER_ERROR_CODES,
 } from "../constants";
-import { MANAGED_USER_SELECT, mapManagedUserRow } from "./userMapper";
+import { MANAGED_USER_SELECT, loadManagersForRows, mapManagedUserRow } from "./userMapper";
 
 /**
  * @param {string} code
@@ -76,7 +76,14 @@ async function fetchManagedUserById(supabase, profileId) {
     throw createUserError(USER_ERROR_CODES.NOT_FOUND, "User not found.");
   }
 
-  return mapManagedUserRow(data);
+  let managersById;
+  try {
+    managersById = await loadManagersForRows(supabase, [data]);
+  } catch (err) {
+    throw mapDatabaseError(err);
+  }
+
+  return mapManagedUserRow(data, managersById);
 }
 
 /**
@@ -119,10 +126,19 @@ async function executeGetUserList(supabase, options = {}) {
     throw mapDatabaseError(error);
   }
 
+  const rows = data ?? [];
+
+  let managersById;
+  try {
+    managersById = await loadManagersForRows(supabase, rows);
+  } catch (err) {
+    throw mapDatabaseError(err);
+  }
+
   const total = count ?? 0;
 
   return {
-    items: (data ?? []).map(mapManagedUserRow),
+    items: rows.map((row) => mapManagedUserRow(row, managersById)),
     total,
     page,
     pageSize,

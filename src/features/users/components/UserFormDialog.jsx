@@ -23,6 +23,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -204,7 +205,7 @@ export function UserFormDialog({
           <DialogTitle>{titles[mode]}</DialogTitle>
           <DialogDescription>
             {isCreate
-              ? "A Supabase invite email will be sent. The new profile starts as Invited and becomes Active after first login."
+              ? "Optionally set an initial password to share with the user directly. Leave it blank if they will set one later via password recovery email. Status starts as Invited and becomes Active after first login."
               : "Email cannot be changed. Update role, manager, or status to control access."}
           </DialogDescription>
         </DialogHeader>
@@ -254,10 +255,32 @@ export function UserFormDialog({
               />
             ) : (
               <div className="space-y-2">
-                <FormLabel>Email</FormLabel>
+                <Label>Email</Label>
                 <Input value={user?.email ?? ""} disabled readOnly />
               </div>
             )}
+
+            {isCreate ? (
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Initial password (optional)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        autoComplete="new-password"
+                        placeholder="Leave blank to set later"
+                        disabled={isSubmitting}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : null}
 
             <FormField
               control={form.control}
@@ -386,7 +409,7 @@ export function UserFormDialog({
                     Saving...
                   </>
                 ) : isCreate ? (
-                  "Invite user"
+                  "Create user"
                 ) : (
                   "Save changes"
                 )}

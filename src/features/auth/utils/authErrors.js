@@ -42,6 +42,8 @@ export function getAuthErrorMessage(code) {
   switch (code) {
     case AUTH_ERROR_CODES.INVALID_CREDENTIALS:
       return "Invalid email or password.";
+    case AUTH_ERROR_CODES.INVALID_CURRENT_PASSWORD:
+      return "Current password is incorrect.";
     case AUTH_ERROR_CODES.EMAIL_NOT_CONFIRMED:
       return "Please confirm your email before signing in.";
     case AUTH_ERROR_CODES.USER_NOT_FOUND:
@@ -54,6 +56,10 @@ export function getAuthErrorMessage(code) {
       return "Your account has not been activated. Please contact your administrator.";
     case AUTH_ERROR_CODES.ROLE_MISSING:
       return "Your account role could not be determined. Please contact an administrator.";
+    case AUTH_ERROR_CODES.PASSWORD_UNCHANGED:
+      return "New password must be different from your current password.";
+    case AUTH_ERROR_CODES.WEAK_PASSWORD:
+      return "Password does not meet security requirements.";
     default:
       return "Something went wrong. Please try again.";
   }

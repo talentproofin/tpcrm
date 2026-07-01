@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { cn } from "@/utils/cn";
 import { getAuthBrowserClient } from "@/features/auth/services/authClient";
 import { getRoleById } from "@/features/auth/services/profileService";
 import { useCurrentProfile } from "@/features/leads/hooks/useCurrentProfile";
@@ -13,10 +15,40 @@ import { REPORT_ROUTES } from "@/features/reports/constants/routes";
 import { canAccessDailyReport } from "@/features/reports/constants/roles";
 import { canAccessSettings } from "@/features/settings/constants/permissions";
 import { SETTINGS_ROUTES } from "@/features/settings/constants/routes";
+import { AUTH_ROUTES } from "@/features/auth/constants/routes";
+
+/**
+ * @param {{ href: string, isActive: boolean, children: React.ReactNode }} props
+ */
+function NavLink({ href, isActive, children }) {
+  return (
+    <Link
+      href={href}
+      aria-current={isActive ? "page" : undefined}
+      className={cn(
+        "rounded-md px-2 py-1 transition-colors",
+        isActive
+          ? "bg-muted font-medium text-foreground"
+          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+      )}
+    >
+      {children}
+    </Link>
+  );
+}
 
 export function DashboardNav() {
+  const pathname = usePathname();
   const { profile } = useCurrentProfile();
   const [roleCode, setRoleCode] = useState(null);
+
+  const isFollowUpsActive = pathname.startsWith(FOLLOWUP_ROUTES.WORKSPACE);
+  const isLeadsActive = pathname.startsWith(LEAD_ROUTES.LIST);
+  const isDashboardActive = pathname === "/dashboard";
+  const isDailyReportActive = pathname.startsWith(REPORT_ROUTES.DAILY);
+  const isUsersActive = pathname.startsWith(USER_ROUTES.LIST);
+  const isSettingsActive = pathname.startsWith(SETTINGS_ROUTES.ROOT);
+  const isAccountActive = pathname.startsWith(AUTH_ROUTES.ACCOUNT);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,46 +74,37 @@ export function DashboardNav() {
   }, [profile]);
 
   return (
-    <nav className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground sm:gap-4">
-      <Link
-        href={FOLLOWUP_ROUTES.WORKSPACE}
-        className="transition-colors hover:text-foreground"
-      >
+    <nav
+      className="flex flex-wrap items-center gap-1 text-sm sm:gap-2"
+      aria-label="Main navigation"
+    >
+      <NavLink href={FOLLOWUP_ROUTES.WORKSPACE} isActive={isFollowUpsActive}>
         Follow-ups
-      </Link>
-      <Link
-        href={LEAD_ROUTES.LIST}
-        className="transition-colors hover:text-foreground"
-      >
+      </NavLink>
+      <NavLink href={LEAD_ROUTES.LIST} isActive={isLeadsActive}>
         Leads
-      </Link>
-      <Link href="/dashboard" className="transition-colors hover:text-foreground">
+      </NavLink>
+      <NavLink href="/dashboard" isActive={isDashboardActive}>
         Dashboard
-      </Link>
+      </NavLink>
       {canAccessDailyReport(roleCode) ? (
-        <Link
-          href={REPORT_ROUTES.DAILY}
-          className="transition-colors hover:text-foreground"
-        >
+        <NavLink href={REPORT_ROUTES.DAILY} isActive={isDailyReportActive}>
           Daily Report
-        </Link>
+        </NavLink>
       ) : null}
       {canAccessUserManagement(roleCode) ? (
-        <Link
-          href={USER_ROUTES.LIST}
-          className="transition-colors hover:text-foreground"
-        >
+        <NavLink href={USER_ROUTES.LIST} isActive={isUsersActive}>
           Users
-        </Link>
+        </NavLink>
       ) : null}
       {canAccessSettings(roleCode) ? (
-        <Link
-          href={SETTINGS_ROUTES.ORGANIZATION}
-          className="transition-colors hover:text-foreground"
-        >
+        <NavLink href={SETTINGS_ROUTES.ORGANIZATION} isActive={isSettingsActive}>
           Settings
-        </Link>
+        </NavLink>
       ) : null}
+      <NavLink href={AUTH_ROUTES.ACCOUNT} isActive={isAccountActive}>
+        Account
+      </NavLink>
     </nav>
   );
 }

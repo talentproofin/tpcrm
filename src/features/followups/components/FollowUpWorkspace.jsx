@@ -16,6 +16,7 @@ import {
 import { CardListSkeleton } from "@/components/feedback/PageSkeletons";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { ErrorState } from "@/components/feedback/ErrorState";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { getAuthBrowserClient } from "@/features/auth/services/authClient";
 import { LEAD_ROUTES } from "@/features/leads/constants/routes";
 import { getAssignableProfiles } from "@/features/leads/services/leadService";
@@ -24,7 +25,7 @@ import {
   getLeadStages,
   getLeadTypes,
 } from "@/services/lookups/lookupService";
-import { FOLLOWUP_VIEWS } from "../constants/routes";
+import { FOLLOWUP_VIEWS, SEARCH_DEBOUNCE_MS } from "../constants";
 import { getFollowUpWorkspace } from "../services/followUpService";
 import { FollowUpCard } from "./FollowUpCard";
 import { FollowUpFilters } from "./FollowUpFilters";
@@ -67,7 +68,8 @@ function FollowUpSection({ title, items, onComplete, showEmpty = false }) {
 export function FollowUpWorkspace() {
   const searchParams = useSearchParams();
   const { profile, loading: profileLoading } = useCurrentProfile();
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS);
   const [view, setView] = useState(FOLLOWUP_VIEWS.ALL);
   const [assignedToMe, setAssignedToMe] = useState(true);
   const [assignedToProfileId, setAssignedToProfileId] = useState("");
@@ -88,7 +90,7 @@ export function FollowUpWorkspace() {
 
     const supabase = getAuthBrowserClient();
     const { data, error: loadError } = await getFollowUpWorkspace(supabase, {
-      search,
+      search: debouncedSearch,
       view,
       assignedToMe: assignedToMe && profile ? true : false,
       assignedToProfileId:
@@ -108,7 +110,7 @@ export function FollowUpWorkspace() {
 
     setLoading(false);
   }, [
-    search,
+    debouncedSearch,
     view,
     assignedToMe,
     assignedToProfileId,
@@ -120,14 +122,14 @@ export function FollowUpWorkspace() {
   const hasActiveFilters = useMemo(
     () =>
       Boolean(
-        search ||
+        debouncedSearch ||
           view !== FOLLOWUP_VIEWS.ALL ||
           !assignedToMe ||
           assignedToProfileId ||
           leadTypeId ||
           stageId
       ),
-    [search, view, assignedToMe, assignedToProfileId, leadTypeId, stageId]
+    [debouncedSearch, view, assignedToMe, assignedToProfileId, leadTypeId, stageId]
   );
 
   useEffect(() => {
@@ -177,11 +179,7 @@ export function FollowUpWorkspace() {
       return;
     }
 
-    const timeout = setTimeout(() => {
-      loadWorkspace();
-    }, 200);
-
-    return () => clearTimeout(timeout);
+    loadWorkspace();
   }, [loadWorkspace, profileLoading]);
 
   function handleComplete(item) {
@@ -230,7 +228,7 @@ export function FollowUpWorkspace() {
         </CardHeader>
         <CardContent>
           <FollowUpFilters
-            search={search}
+            search={searchInput}
             view={view}
             assignedToMe={assignedToMe}
             assignedToProfileId={assignedToProfileId}
@@ -239,13 +237,13 @@ export function FollowUpWorkspace() {
             leadTypes={leadTypes}
             stages={stages}
             profiles={profiles}
-            onSearchChange={setSearch}
+            onSearchChange={setSearchInput}
             onViewChange={setView}
             onAssignedToMeChange={setAssignedToMe}
             onAssignedToProfileIdChange={setAssignedToProfileId}
             onLeadTypeChange={setLeadTypeId}
             onStageChange={setStageId}
-            disabled={loading || profileLoading}
+            disableFilters={loading || profileLoading}
           />
         </CardContent>
       </Card>

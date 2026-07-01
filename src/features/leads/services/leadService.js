@@ -222,28 +222,58 @@ async function executeUpdateLead(supabase, profileId, leadId, input) {
 }
 
 /**
+ * @param {import('@supabase/supabase-js').PostgrestError | null | undefined} error
+ * @param {string} fallback
+ * @returns {never}
+ */
+function throwLeadMutationError(error, fallback) {
+  const message = error?.message ?? "";
+
+  if (message.includes("Lead not found")) {
+    throw createLeadError(LEAD_ERROR_CODES.NOT_FOUND, "Lead not found.");
+  }
+
+  if (
+    message.includes("Archived leads cannot be moved to trash") ||
+    message.includes("chk_leads_deleted_not_archived")
+  ) {
+    throw createLeadError(
+      LEAD_ERROR_CODES.ARCHIVED,
+      "Archived leads cannot be moved to trash."
+    );
+  }
+
+  if (message.includes("permission to delete")) {
+    throw createLeadError(
+      LEAD_ERROR_CODES.FORBIDDEN,
+      "You do not have permission to delete this lead."
+    );
+  }
+
+  if (message.includes("already in trash")) {
+    throw createLeadError(
+      LEAD_ERROR_CODES.VALIDATION,
+      "This lead is already in trash."
+    );
+  }
+
+  throw createLeadError(LEAD_ERROR_CODES.UNKNOWN, fallback);
+}
+
+/**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string} profileId
  * @param {string} leadId
  * @returns {Promise<import('../types/lead').Lead>}
  */
 async function executeDeleteLead(supabase, profileId, leadId) {
-  await fetchLeadById(supabase, leadId);
-
-  const { error } = await supabase
-    .from("leads")
-    .update({
-      deleted_at: new Date().toISOString(),
-      deleted_by_profile_id: profileId,
-      updated_by_profile_id: profileId,
-    })
-    .eq("id", leadId);
+  const { error } = await supabase.rpc("soft_delete_lead", {
+    p_lead_id: leadId,
+    p_deleted_by_profile_id: profileId,
+  });
 
   if (error) {
-    throw createLeadError(
-      LEAD_ERROR_CODES.UNKNOWN,
-      "Unable to delete lead. Please try again."
-    );
+    throwLeadMutationError(error, "Unable to delete lead. Please try again.");
   }
 
   return fetchLeadById(supabase, leadId);

@@ -23,7 +23,7 @@ import {
  *   onLeadTypeChange: (value: string) => void,
  *   onOwnerChange: (value: string) => void,
  *   onIncludeTrashedChange: (value: boolean) => void,
- *   disabled?: boolean,
+ *   disableFilters?: boolean,
  * }} props
  */
 export function LeadFilters({
@@ -40,7 +40,7 @@ export function LeadFilters({
   onLeadTypeChange,
   onOwnerChange,
   onIncludeTrashedChange,
-  disabled = false,
+  disableFilters = false,
 }) {
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -51,7 +51,6 @@ export function LeadFilters({
           placeholder="Search by organization name..."
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
-          disabled={disabled}
         />
       </div>
 
@@ -62,7 +61,7 @@ export function LeadFilters({
           onValueChange={(value) =>
             onStageChange(value === "__all__" ? "" : value)
           }
-          disabled={disabled}
+          disabled={disableFilters}
         >
           <SelectTrigger>
             <SelectValue placeholder="All stages" />
@@ -85,7 +84,7 @@ export function LeadFilters({
           onValueChange={(value) =>
             onLeadTypeChange(value === "__all__" ? "" : value)
           }
-          disabled={disabled}
+          disabled={disableFilters}
         >
           <SelectTrigger>
             <SelectValue placeholder="All types" />
@@ -108,7 +107,7 @@ export function LeadFilters({
           onValueChange={(value) =>
             onOwnerChange(value === "__all__" ? "" : value)
           }
-          disabled={disabled}
+          disabled={disableFilters}
         >
           <SelectTrigger>
             <SelectValue placeholder="All owners" />
@@ -131,7 +130,7 @@ export function LeadFilters({
             className="h-4 w-4 rounded border border-input"
             checked={includeTrashed}
             onChange={(event) => onIncludeTrashedChange(event.target.checked)}
-            disabled={disabled}
+            disabled={disableFilters}
           />
           Show trashed leads only
         </label>

@@ -116,6 +116,7 @@ export function LeadDetailView({ leadId }) {
 
   const isTrashed = Boolean(lead.deletedAt);
   const isArchived = Boolean(lead.archivedAt);
+  const canDelete = !isTrashed && !lead.outcome;
 
   return (
     <div className="space-y-6">
@@ -144,7 +145,7 @@ export function LeadDetailView({ leadId }) {
               Edit
             </Link>
           </Button>
-          {!isTrashed ? (
+          {!isTrashed && canDelete ? (
             <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
               <Trash2 className="h-4 w-4" aria-hidden="true" />
               Delete
@@ -186,6 +187,11 @@ export function LeadDetailView({ leadId }) {
           <div className="sm:col-span-2">
             <DetailField label="Description" value={lead.description} />
           </div>
+          {isArchived ? (
+            <p className="text-sm text-muted-foreground">
+              Archived leads cannot be moved to trash.
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 

@@ -30,18 +30,22 @@ const STATUS_VARIANTS = {
  *   users: import('../types/user').ManagedUser[],
  *   canManage: boolean,
  *   onEdit: (user: import('../types/user').ManagedUser) => void,
+ *   onSetPassword: (user: import('../types/user').ManagedUser) => void,
  *   onResendInvite: (user: import('../types/user').ManagedUser) => void,
  *   onSendRecovery: (user: import('../types/user').ManagedUser) => void,
  *   actionProfileId?: string | null,
+ *   currentProfileId?: string | null,
  * }} props
  */
 export function UserTable({
   users,
   canManage,
   onEdit,
+  onSetPassword,
   onResendInvite,
   onSendRecovery,
   actionProfileId = null,
+  currentProfileId = null,
 }) {
   if (users.length === 0) {
     return (
@@ -97,6 +101,16 @@ export function UserTable({
                     >
                       Edit
                     </Button>
+                    {user.profileId !== currentProfileId ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onSetPassword(user)}
+                      >
+                        Set password
+                      </Button>
+                    ) : null}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button

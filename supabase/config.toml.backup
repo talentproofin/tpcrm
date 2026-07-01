@@ -1,0 +1,11 @@
+# TalentProof Sales CRM — Supabase local configuration
+
+[project]
+id = "tpcrm"
+
+[db]
+major_version = 15
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
