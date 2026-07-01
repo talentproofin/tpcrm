@@ -44,14 +44,20 @@ export function LoginForm() {
   async function onSubmit(values) {
     setFormError(null);
 
-    const { data, error } = await authService.signIn(values);
+    const { data: result, error } = await authService.signIn(values);
 
     if (error) {
       setFormError(getAuthErrorMessage(mapAuthErrorCode(error)));
       return;
     }
 
-    if (data) {
+    if (result?.accessDenied && result.accessReason) {
+      const params = new URLSearchParams({ reason: result.accessReason });
+      router.replace(`${AUTH_ROUTES.ACCESS_PENDING}?${params.toString()}`);
+      return;
+    }
+
+    if (result?.data) {
       router.replace(AUTH_ROUTES.DASHBOARD);
     }
   }
@@ -91,6 +97,7 @@ export function LoginForm() {
                     <Input
                       type="email"
                       autoComplete="email"
+                      autoFocus
                       placeholder="you@company.com"
                       disabled={isSubmitting}
                       {...field}

@@ -3,8 +3,10 @@
 PostgreSQL persistence layer for TalentProof Sales CRM via Supabase.
 
 **Milestone**: 5 — Persistence Design  
-**Status**: Awaiting approval  
+**Status**: Revised — identity architecture update (awaiting approval)  
 **Scope**: Design only — **no SQL, no migrations, no implementation**
+
+**Revision (Identity)**: Separates Supabase Auth from CRM business identity. Profiles are admin-provisioned only. MVP permissions live in application code, not database tables.
 
 **Source of truth**: [Domain Model](../domain/domain-model.md) (M4, approved)
 
@@ -30,6 +32,8 @@ PostgreSQL persistence layer for TalentProof Sales CRM via Supabase.
 | [14. Seed Strategy](#14-seed-strategy) | Development bootstrap data |
 | [15. Derived Views](#15-derived-views) | Timeline (no table) |
 | [16. Entity Diagram](#16-entity-diagram) | Physical ER diagram |
+| [17. Identity & Authentication Flow](#17-identity--authentication-flow) | Login, profile gate, access denied |
+| [18. MVP Permission Matrix](#18-mvp-permission-matrix-application) | Role capabilities in code (V2 = DB permissions) |
 
 ---
 
@@ -44,7 +48,8 @@ Define how approved domain entities are stored in PostgreSQL so that migrations 
 | Principle | Application |
 |-----------|-------------|
 | Domain traceability | Every table maps to a domain entity |
-| Supabase Auth integration | `auth.users` for credentials; `profiles` for CRM User |
+| Auth vs business identity | `auth.users` for credentials; `profiles` for CRM business identity (separate PKs) |
+| Admin-provisioned profiles | Profiles created by Admin only — never auto-created at login |
 | RLS by default | Every application table has RLS enabled |
 | Soft delete for recoverable entities | `deleted_at` column — not for Activity or AuditLog |
 | Archive via outcome | Lead `outcome` + `archived_at` — separate from trash |
@@ -57,8 +62,21 @@ Define how approved domain entities are stored in PostgreSQL so that migrations 
 | Layer | Storage |
 |-------|---------|
 | Credentials | `auth.users` (Supabase managed) |
-| CRM profile | `profiles` table linked via `id` = `auth.users.id` |
-| Role | `profiles.role_id` → `roles` |
+| CRM business identity | `profiles` table — separate from auth |
+| Auth link | `profiles.auth_user_id` → `auth.users.id` (nullable until linked) |
+| Business identity PK | `profiles.profile_id` — referenced by all business tables |
+| Role | `profiles.role_id` → `roles` (assigned by Admin only) |
+| Permissions (MVP) | Application code matrix by role code — **not** database tables |
+| Permissions (V2) | `permissions` + `role_permissions` tables (deferred) |
+
+### Identity Rules
+
+| Rule | Detail |
+|------|--------|
+| No auto-create at login | Authentication may succeed without a profile; CRM access requires an existing active profile |
+| Admin creates profiles | Only Admin provisions profiles and assigns roles |
+| No default role | New auth users do not receive a role until Admin assigns one |
+| Business FKs | All business tables reference `profiles.profile_id`, never `auth.users.id` |
 
 ---
 
@@ -68,10 +86,10 @@ Logical entities and their persistence mapping.
 
 | Domain Entity | Logical Store | Notes |
 |---------------|---------------|-------|
-| User | `profiles` + `auth.users` | Profile extends auth identity |
+| User | `profiles` + `auth.users` | Auth credentials separate from business identity |
 | Role | `roles` | Reference data |
-| Permission | `permissions` | Reference data |
-| Role ↔ Permission | `role_permissions` | Junction |
+| Permission (MVP) | Application code | Role capability matrix in `src/features/auth/config/` |
+| Permission (V2) | `permissions` + `role_permissions` | Deferred — fine-grained DB permissions |
 | Lead | `leads` | Aggregate root |
 | Contact | `contacts` | Child of Lead |
 | Activity | `activities` | Append-only |
@@ -87,23 +105,22 @@ Logical entities and their persistence mapping.
 ### Logical Relationships
 
 ```
-auth.users 1──1 profiles
+auth.users 1──0..1 profiles (via auth_user_id)
 profiles N──1 roles
-profiles N──1 profiles (manager_id, self-ref for team)
-roles N──M permissions (via role_permissions)
+profiles N──1 profiles (manager_profile_id, self-ref for team)
 
-profiles 1──N leads (owner_id)
-profiles 1──N leads (assigned_to_id, nullable)
+profiles 1──N leads (owner_profile_id)
+profiles 1──N leads (assigned_to_profile_id, nullable)
 leads 1──N contacts
 leads 1──N activities
 leads 1──N demos
 leads 1──N tasks
 activities 1──N follow_ups
-profiles 1──N follow_ups (assigned_to_id)
-profiles 1──N tasks (assigned_to_id)
-profiles 1──N notifications
-profiles 1──N reports (recipient_id)
-profiles 1──N audit_logs (actor_id)
+profiles 1──N follow_ups (assigned_to_profile_id)
+profiles 1──N tasks (assigned_to_profile_id)
+profiles 1──N notifications (recipient_profile_id)
+profiles 1──N reports (recipient_profile_id)
+profiles 1──N audit_logs (actor_profile_id)
 ```
 
 ---
@@ -121,7 +138,11 @@ profiles 1──N audit_logs (actor_id)
 | created_at | timestamptz | NOT NULL | Audit |
 | updated_at | timestamptz | NOT NULL | Audit |
 
-### 3.2 `permissions`
+### 3.2 `permissions` (V2 — deferred)
+
+> **MVP**: Permissions are enforced via the [application permission matrix](#18-mvp-permission-matrix-application). Database permission tables are **not** created in the identity foundation milestone.
+
+Planned for V2:
 
 | Column | Type | Nullable | Description |
 |--------|------|----------|-------------|
@@ -132,7 +153,9 @@ profiles 1──N audit_logs (actor_id)
 | description | text | YES | Human-readable |
 | created_at | timestamptz | NOT NULL | Audit |
 
-### 3.3 `role_permissions`
+### 3.3 `role_permissions` (V2 — deferred)
+
+> **MVP**: Role capabilities defined in code. Junction table deferred to V2.
 
 | Column | Type | Nullable | Description |
 |--------|------|----------|-------------|
@@ -143,19 +166,22 @@ profiles 1──N audit_logs (actor_id)
 
 | Column | Type | Nullable | Description |
 |--------|------|----------|-------------|
-| id | uuid | PK, FK | → `auth.users.id` |
-| email | text | NOT NULL | Denormalized from auth |
+| profile_id | uuid | PK | Business identity primary key (`gen_random_uuid()`) |
+| auth_user_id | uuid | YES, FK, UNIQUE | → `auth.users.id` — set when Admin links auth account |
+| email | text | NOT NULL | Denormalized from auth or entered by Admin |
 | display_name | text | NOT NULL | |
 | phone | text | YES | |
-| role_id | uuid | NOT NULL, FK | → `roles.id` |
-| manager_id | uuid | YES, FK | → `profiles.id` (team hierarchy) |
-| status | user_status | NOT NULL | Enum |
+| role_id | uuid | NOT NULL, FK | → `roles.id` — assigned by Admin only |
+| manager_profile_id | uuid | YES, FK | → `profiles.profile_id` (team hierarchy) |
+| status | user_status | NOT NULL | `invited`, `active`, `deactivated` |
 | deleted_at | timestamptz | YES | Soft delete |
-| deleted_by | uuid | YES, FK | → `profiles.id` |
+| deleted_by_profile_id | uuid | YES, FK | → `profiles.profile_id` |
 | created_at | timestamptz | NOT NULL | Audit |
 | updated_at | timestamptz | NOT NULL | Audit |
-| created_by | uuid | YES, FK | → `profiles.id` |
-| updated_by | uuid | YES, FK | → `profiles.id` |
+| created_by_profile_id | uuid | YES, FK | → `profiles.profile_id` |
+| updated_by_profile_id | uuid | YES, FK | → `profiles.profile_id` |
+
+**Activation rule**: A user may authenticate via Supabase Auth, but CRM access requires a profile with `status = active` and a valid `role_id`. Profiles are created by Admin — never auto-created at login.
 
 ### 3.5 `app_settings`
 
@@ -165,7 +191,7 @@ profiles 1──N audit_logs (actor_id)
 | value | jsonb | NOT NULL | Setting value |
 | description | text | YES | |
 | updated_at | timestamptz | NOT NULL | |
-| updated_by | uuid | YES, FK | → `profiles.id` |
+| updated_by_profile_id | uuid | YES, FK | → `profiles.profile_id` |
 
 **Seed keys**: `organization_timezone` (default `Asia/Kolkata`), `trash_retention_days` (default `30`)
 
@@ -175,8 +201,8 @@ profiles 1──N audit_logs (actor_id)
 |--------|------|----------|-------------|
 | id | uuid | PK | |
 | title | text | NOT NULL | |
-| owner_id | uuid | NOT NULL, FK | → `profiles.id` |
-| assigned_to_id | uuid | YES, FK | → `profiles.id` (reassignment) |
+| owner_profile_id | uuid | NOT NULL, FK | → `profiles.profile_id` |
+| assigned_to_profile_id | uuid | YES, FK | → `profiles.profile_id` (reassignment) |
 | status | lead_status | NOT NULL | `active`, `in_progress`, `trashed` |
 | outcome | lead_outcome | YES | `won`, `lost`, `archived` — set when closing |
 | source | text | YES | |
@@ -184,11 +210,11 @@ profiles 1──N audit_logs (actor_id)
 | notes | text | YES | |
 | archived_at | timestamptz | YES | Set when outcome is set |
 | deleted_at | timestamptz | YES | Soft delete (trash) |
-| deleted_by | uuid | YES, FK | → `profiles.id` |
+| deleted_by_profile_id | uuid | YES, FK | → `profiles.profile_id` |
 | created_at | timestamptz | NOT NULL | |
 | updated_at | timestamptz | NOT NULL | |
-| created_by | uuid | NOT NULL, FK | → `profiles.id` |
-| updated_by | uuid | YES, FK | → `profiles.id` |
+| created_by_profile_id | uuid | NOT NULL, FK | → `profiles.profile_id` |
+| updated_by_profile_id | uuid | YES, FK | → `profiles.profile_id` |
 
 **Archive rule**: When `outcome` is set (`won`, `lost`, or `archived`), `archived_at` is set and Lead is in Archive.
 
@@ -205,11 +231,11 @@ profiles 1──N audit_logs (actor_id)
 | job_title | text | YES | |
 | is_primary | boolean | NOT NULL | Default false |
 | deleted_at | timestamptz | YES | |
-| deleted_by | uuid | YES, FK | |
+| deleted_by_profile_id | uuid | YES, FK | |
 | created_at | timestamptz | NOT NULL | |
 | updated_at | timestamptz | NOT NULL | |
-| created_by | uuid | NOT NULL, FK | |
-| updated_by | uuid | YES, FK | |
+| created_by_profile_id | uuid | NOT NULL, FK | |
+| updated_by_profile_id | uuid | YES, FK | |
 
 ### 3.8 `activities`
 
@@ -220,7 +246,7 @@ profiles 1──N audit_logs (actor_id)
 | type | activity_type | NOT NULL | Enum |
 | description | text | NOT NULL | |
 | occurred_at | timestamptz | NOT NULL | |
-| created_by | uuid | NOT NULL, FK | → `profiles.id` |
+| created_by_profile_id | uuid | NOT NULL, FK | → `profiles.profile_id` |
 | created_at | timestamptz | NOT NULL | Immutable — no `updated_at` |
 
 **No soft delete. No update after insert** (append-only, BR-ACT-01).
@@ -232,15 +258,15 @@ profiles 1──N audit_logs (actor_id)
 | id | uuid | PK | |
 | activity_id | uuid | NOT NULL, FK | → `activities.id` |
 | lead_id | uuid | NOT NULL, FK | → `leads.id` (denormalized) |
-| assigned_to_id | uuid | NOT NULL, FK | → `profiles.id` |
+| assigned_to_profile_id | uuid | NOT NULL, FK | → `profiles.profile_id` |
 | due_at | timestamptz | NOT NULL | Stored UTC; evaluated in org timezone |
 | notes | text | YES | |
 | status | follow_up_status | NOT NULL | `pending`, `completed`, `overdue` |
 | completed_at | timestamptz | YES | |
 | created_at | timestamptz | NOT NULL | |
 | updated_at | timestamptz | NOT NULL | |
-| created_by | uuid | NOT NULL, FK | |
-| updated_by | uuid | YES, FK | |
+| created_by_profile_id | uuid | NOT NULL, FK | → `profiles.profile_id` |
+| updated_by_profile_id | uuid | YES, FK | → `profiles.profile_id` |
 
 **Multiple FollowUps per Activity** (OD-07). Minimum 1 at Activity creation.
 
@@ -253,12 +279,12 @@ profiles 1──N audit_logs (actor_id)
 | scheduled_at | timestamptz | NOT NULL | |
 | status | demo_status | NOT NULL | |
 | notes | text | YES | |
-| created_by | uuid | NOT NULL, FK | |
+| created_by_profile_id | uuid | NOT NULL, FK | → `profiles.profile_id` |
 | deleted_at | timestamptz | YES | |
-| deleted_by | uuid | YES, FK | |
+| deleted_by_profile_id | uuid | YES, FK | → `profiles.profile_id` |
 | created_at | timestamptz | NOT NULL | |
 | updated_at | timestamptz | NOT NULL | |
-| updated_by | uuid | YES, FK | |
+| updated_by_profile_id | uuid | YES, FK | → `profiles.profile_id` |
 
 ### 3.11 `tasks`
 
@@ -266,18 +292,18 @@ profiles 1──N audit_logs (actor_id)
 |--------|------|----------|-------------|
 | id | uuid | PK | |
 | lead_id | uuid | YES, FK | Optional |
-| assigned_to_id | uuid | NOT NULL, FK | |
+| assigned_to_profile_id | uuid | NOT NULL, FK | → `profiles.profile_id` |
 | title | text | NOT NULL | |
 | description | text | YES | |
 | status | task_status | NOT NULL | |
 | due_at | timestamptz | YES | |
 | completed_at | timestamptz | YES | |
 | deleted_at | timestamptz | YES | |
-| deleted_by | uuid | YES, FK | |
+| deleted_by_profile_id | uuid | YES, FK | |
 | created_at | timestamptz | NOT NULL | |
 | updated_at | timestamptz | NOT NULL | |
-| created_by | uuid | NOT NULL, FK | |
-| updated_by | uuid | YES, FK | |
+| created_by_profile_id | uuid | NOT NULL, FK | |
+| updated_by_profile_id | uuid | YES, FK | |
 
 ### 3.12 `reports`
 
@@ -285,7 +311,7 @@ profiles 1──N audit_logs (actor_id)
 |--------|------|----------|-------------|
 | id | uuid | PK | |
 | type | report_type | NOT NULL | |
-| recipient_id | uuid | NOT NULL, FK | → `profiles.id` |
+| recipient_profile_id | uuid | NOT NULL, FK | → `profiles.profile_id` |
 | period_start | timestamptz | NOT NULL | |
 | period_end | timestamptz | NOT NULL | |
 | delivery_channel | report_delivery | NOT NULL | `email`, `in_app` |
@@ -298,7 +324,7 @@ profiles 1──N audit_logs (actor_id)
 | Column | Type | Nullable | Description |
 |--------|------|----------|-------------|
 | id | uuid | PK | |
-| recipient_id | uuid | NOT NULL, FK | |
+| recipient_profile_id | uuid | NOT NULL, FK | → `profiles.profile_id` |
 | type | notification_type | NOT NULL | |
 | title | text | NOT NULL | |
 | body | text | YES | |
@@ -313,7 +339,7 @@ profiles 1──N audit_logs (actor_id)
 | Column | Type | Nullable | Description |
 |--------|------|----------|-------------|
 | id | uuid | PK | |
-| actor_id | uuid | NOT NULL, FK | → `profiles.id` |
+| actor_profile_id | uuid | NOT NULL, FK | → `profiles.profile_id` |
 | action | audit_action | NOT NULL | Enum |
 | entity_type | text | NOT NULL | |
 | entity_id | uuid | NOT NULL | |
@@ -329,12 +355,13 @@ profiles 1──N audit_logs (actor_id)
 | Element | Convention | Example |
 |---------|------------|---------|
 | Tables | snake_case, plural | `follow_ups`, `audit_logs` |
-| Columns | snake_case | `owner_id`, `due_at` |
-| Primary keys | `id` (uuid) | `id` |
-| Foreign keys | `{entity}_id` | `lead_id`, `assigned_to_id` |
+| Columns | snake_case | `owner_profile_id`, `due_at` |
+| Primary keys | `profile_id` or `id` (uuid) | `profile_id` on profiles; `id` on other tables |
+| Foreign keys | `{entity}_profile_id` or `{entity}_id` | `lead_id`, `owner_profile_id` |
+| Profile FK target | `profiles.profile_id` | All business identity references |
 | Enums | snake_case type name | `lead_outcome` |
 | Enum values | snake_case | `in_progress` |
-| Indexes | `idx_{table}_{columns}` | `idx_leads_owner_id` |
+| Indexes | `idx_{table}_{columns}` | `idx_leads_owner_profile_id` |
 | Unique constraints | `uq_{table}_{column}` | `uq_roles_code` |
 | Check constraints | `chk_{table}_{rule}` | `chk_leads_outcome_archived` |
 | RLS policies | `{table}_{operation}_{scope}` | `leads_select_own` |
@@ -354,9 +381,9 @@ All tables use `uuid` primary key with `gen_random_uuid()` default at migration 
 | Table | Column(s) | Rule |
 |-------|-----------|------|
 | roles | code | One row per role |
-| permissions | code | One row per permission |
+| profiles | email | Unique among non-deleted (where `deleted_at IS NULL`) |
+| profiles | auth_user_id | Unique when not null |
 | app_settings | key | One row per setting |
-| profiles | email | Unique among non-deleted |
 
 ### Check Constraints
 
@@ -387,23 +414,22 @@ All tables use `uuid` primary key with `gen_random_uuid()` default at migration 
 
 | Child Table | Column | Parent | On Delete |
 |-------------|--------|--------|-----------|
+| profiles | auth_user_id | auth.users | SET NULL |
 | profiles | role_id | roles | RESTRICT |
-| profiles | manager_id | profiles | SET NULL |
-| role_permissions | role_id | roles | CASCADE |
-| role_permissions | permission_id | permissions | CASCADE |
-| leads | owner_id | profiles | RESTRICT |
-| leads | assigned_to_id | profiles | SET NULL |
+| profiles | manager_profile_id | profiles | SET NULL |
+| leads | owner_profile_id | profiles | RESTRICT |
+| leads | assigned_to_profile_id | profiles | SET NULL |
 | contacts | lead_id | leads | RESTRICT |
 | activities | lead_id | leads | RESTRICT |
 | follow_ups | activity_id | activities | RESTRICT |
 | follow_ups | lead_id | leads | RESTRICT |
-| follow_ups | assigned_to_id | profiles | RESTRICT |
+| follow_ups | assigned_to_profile_id | profiles | RESTRICT |
 | demos | lead_id | leads | RESTRICT |
 | tasks | lead_id | leads | SET NULL |
-| tasks | assigned_to_id | profiles | RESTRICT |
-| notifications | recipient_id | profiles | CASCADE |
-| reports | recipient_id | profiles | RESTRICT |
-| audit_logs | actor_id | profiles | RESTRICT |
+| tasks | assigned_to_profile_id | profiles | RESTRICT |
+| notifications | recipient_profile_id | profiles | CASCADE |
+| reports | recipient_profile_id | profiles | RESTRICT |
+| audit_logs | actor_profile_id | profiles | RESTRICT |
 
 **RESTRICT** on Lead children prevents orphan records while Lead is active. Soft-deleted Leads retain children until restored or permanently deleted by Admin.
 
@@ -445,8 +471,8 @@ Use PostgreSQL `CREATE TYPE` enums for fixed domain values. Application constant
 |--------|---------|
 | `created_at` | Row creation timestamp (timestamptz, UTC) |
 | `updated_at` | Last modification (auto-updated via trigger) |
-| `created_by` | `profiles.id` of creator |
-| `updated_by` | `profiles.id` of last editor |
+| `created_by_profile_id` | `profiles.profile_id` of creator |
+| `updated_by_profile_id` | `profiles.profile_id` of last editor |
 
 **Applies to**: profiles, leads, contacts, follow_ups, demos, tasks
 
@@ -454,7 +480,7 @@ Use PostgreSQL `CREATE TYPE` enums for fixed domain values. Application constant
 
 | Table | Audit approach |
 |-------|----------------|
-| activities | `created_at`, `created_by` only |
+| activities | `created_at`, `created_by_profile_id` only |
 | audit_logs | `created_at` only |
 | reports | `generated_at`, `created_at` |
 | notifications | `created_at`; `read_at` on status change |
@@ -531,11 +557,12 @@ Restore sets `deleted_at = NULL`, `deleted_by = NULL`, reverts `leads.status` fr
 | Table | Index | Purpose |
 |-------|-------|---------|
 | profiles | `(role_id)` | Role-based queries |
-| profiles | `(manager_id)` | Team hierarchy |
-| profiles | `(email)` UNIQUE | Lookup |
+| profiles | `(manager_profile_id)` | Team hierarchy |
+| profiles | `(auth_user_id)` UNIQUE | Auth lookup at login |
+| profiles | `(email)` | Lookup |
 | profiles | `(deleted_at)` WHERE NULL | Active users |
-| leads | `(owner_id)` | Owner's pipeline |
-| leads | `(assigned_to_id)` | Assigned leads |
+| leads | `(owner_profile_id)` | Owner's pipeline |
+| leads | `(assigned_to_profile_id)` | Assigned leads |
 | leads | `(status)` | Pipeline filters |
 | leads | `(outcome)` WHERE NOT NULL | Archive queries |
 | leads | `(archived_at)` | Archive sorting |
@@ -543,18 +570,18 @@ Restore sets `deleted_at = NULL`, `deleted_by = NULL`, reverts `leads.status` fr
 | leads | `(created_at DESC)` | Recent leads |
 | contacts | `(lead_id)` | Lead detail |
 | activities | `(lead_id, occurred_at DESC)` | Activity log, Timeline |
-| follow_ups | `(assigned_to_id, status)` | My follow-ups |
+| follow_ups | `(assigned_to_profile_id, status)` | My follow-ups |
 | follow_ups | `(lead_id)` | Lead follow-ups |
 | follow_ups | `(due_at)` WHERE status = pending | Overdue job |
 | follow_ups | `(activity_id)` | Activity follow-ups |
 | demos | `(lead_id)` | Lead demos |
 | demos | `(scheduled_at)` | Upcoming demos |
-| tasks | `(assigned_to_id, status)` | My tasks |
+| tasks | `(assigned_to_profile_id, status)` | My tasks |
 | tasks | `(lead_id)` | Lead tasks |
-| notifications | `(recipient_id, status)` | Unread count |
-| reports | `(recipient_id, generated_at DESC)` | Report history |
+| notifications | `(recipient_profile_id, status)` | Unread count |
+| reports | `(recipient_profile_id, generated_at DESC)` | Report history |
 | audit_logs | `(entity_type, entity_id)` | Entity audit trail |
-| audit_logs | `(actor_id, created_at DESC)` | User actions |
+| audit_logs | `(actor_profile_id, created_at DESC)` | User actions |
 | audit_logs | `(created_at DESC)` | Recent audit |
 
 ---
@@ -567,11 +594,11 @@ RLS **enabled on all tables**. Default deny; explicit policies grant access.
 
 | Function | Returns | Purpose |
 |----------|---------|---------|
-| `auth.user_id()` | uuid | Current user's profile id |
+| `auth.profile_id()` | uuid | Current user's `profiles.profile_id` (resolved via `auth_user_id = auth.uid()`) |
 | `auth.user_role()` | text | Current user's role code |
-| `auth.has_permission(code)` | boolean | Permission check |
+| `auth.has_capability(key)` | boolean | MVP capability check (wraps application matrix) |
 | `auth.is_admin()` | boolean | Admin shortcut |
-| `auth.is_manager_of(user_id)` | boolean | Team scope for Manager |
+| `auth.is_manager_of(profile_id)` | boolean | Team scope for Manager |
 
 ### Policy Matrix (summary)
 
@@ -594,7 +621,7 @@ RLS **enabled on all tables**. Default deny; explicit policies grant access.
 | Rule | Policy |
 |------|--------|
 | OD-01 | INSERT on leads: role ∈ {admin, manager, bde, marketing, recruiter} |
-| OD-05 | Manager: SELECT/UPDATE team leads via `manager_id` chain; no DELETE |
+| OD-05 | Manager: SELECT/UPDATE team leads via `manager_profile_id` chain; no DELETE |
 | BR-ACT-01 | No DELETE policy on activities for any role |
 | BR-DATA-01 | Trash visible only to Admin; restore/permanent_delete Admin only |
 | Archive | UPDATE on archived leads denied except Admin read |
@@ -618,11 +645,12 @@ RLS **enabled on all tables**. Default deny; explicit policies grant access.
 
 | Phase | Milestone | Content |
 |-------|-----------|---------|
-| 1 | M6 (Auth) | enums, roles, permissions, role_permissions, profiles, app_settings, RLS base |
-| 2 | M7 (Users) | profile management policies |
-| 3 | M9+ | leads, contacts, activities, follow_ups, demos, tasks per feature |
-| 4 | M15+ | reports, notifications |
-| 5 | M6+ | audit_logs |
+| 1 | M8 (Identity) | `user_status` enum, `roles`, `profiles`, RLS base for identity tables |
+| 2 | M9 (User Management) | Admin profile CRUD; link `auth_user_id`; role assignment |
+| 3 | M10+ | `app_settings`, leads, contacts, activities, follow_ups, demos, tasks per feature |
+| 4 | M16+ | reports, notifications |
+| 5 | M10+ | audit_logs |
+| V2 | Post-MVP | `permissions`, `role_permissions` tables; migrate matrix to DB |
 
 ### Rollback
 
@@ -638,32 +666,45 @@ RLS **enabled on all tables**. Default deny; explicit policies grant access.
 
 | Environment | Seed approach |
 |-------------|---------------|
-| Local development | Full seed via `supabase/seed.sql` |
-| Staging | Roles + permissions + admin user only |
-| Production | Roles + permissions only; no test data |
+| Local development | Roles via `supabase/seed.sql`; profiles created by Admin (not seeded automatically) |
+| Staging | Roles only; Admin-provisioned profiles |
+| Production | Roles only; no test data |
 
-### Seed Order
+### Seed Order (MVP)
 
 1. `roles` (6 roles)
-2. `permissions` (full permission set)
-3. `role_permissions` (matrix per role)
-4. `app_settings` (timezone `Asia/Kolkata`, trash retention 30)
-5. Development only: sample users, leads, activities
+2. `app_settings` (timezone `Asia/Kolkata`, trash retention 30) — when settings milestone ships
+3. Development only: Admin-created sample profiles and domain data
+
+> **No permission seed in MVP.** Role capabilities are defined in application code ([§18](#18-mvp-permission-matrix-application)).
 
 ### Reference Seed Data
 
-**Roles**: ceo, admin, manager, bde, marketing, recruiter
+**Roles** (required):
 
-**Default app_settings**:
+| Code | Name |
+|------|------|
+| `ceo` | CEO |
+| `admin` | Admin |
+| `manager` | Manager |
+| `bde` | Business Development Executive |
+| `marketing` | Marketing Executive |
+| `recruiter` | Recruiter |
+
+**Profiles**: Created by Admin via User Management — **not** auto-created at login. Each profile receives `role_id` at creation time.
+
+**Default app_settings** (when implemented):
 
 | key | value |
 |-----|-------|
 | organization_timezone | `Asia/Kolkata` |
 | trash_retention_days | `30` |
 
-**Development users** (local only): one user per role with known credentials documented in `.env.example` comments — not committed.
+**Development users** (local only): Admin creates Supabase Auth users and links them to profiles via User Management — not committed.
 
-### Permission Seed Highlights (OD-01, OD-05)
+### MVP Capability Highlights (OD-01, OD-05)
+
+See [§18 MVP Permission Matrix](#18-mvp-permission-matrix-application) for the full application-level matrix.
 
 | Role | lead:create | lead:update (team) | trash:permanent_delete |
 |------|-------------|-------------------|------------------------|
@@ -707,9 +748,8 @@ Primary reporting interface — aggregates from leads, activities, follow_ups, d
 
 ```mermaid
 erDiagram
+    auth_users ||--o| profiles : links
     roles ||--o{ profiles : assigns
-    roles ||--o{ role_permissions : has
-    permissions ||--o{ role_permissions : grants
     profiles ||--o{ profiles : manages
     profiles ||--o{ leads : owns
     profiles ||--o{ leads : assigned
@@ -727,12 +767,133 @@ erDiagram
 
 ---
 
+## 17. Identity & Authentication Flow
+
+Authentication (Supabase Auth) and CRM access (profile gate) are **separate steps**.
+
+### Flow
+
+```
+Login (email + password)
+        ↓
+Supabase Auth succeeds?
+        ├─ No  → Show auth error
+        └─ Yes → Load profile by auth_user_id
+                        ↓
+                 Profile exists AND status = active?
+                        ├─ No  → Access Denied
+                        │         "Your account has not been activated.
+                        │          Please contact your administrator."
+                        └─ Yes → Load role (from profiles.role_id)
+                                      ↓
+                                 Load capabilities (from application matrix)
+                                      ↓
+                                 Redirect to Dashboard
+```
+
+### Access Denied
+
+| Condition | Auth result | CRM access |
+|-----------|-------------|------------|
+| Invalid credentials | Fail | Denied |
+| Valid auth, no profile | Success | Denied — Access Denied page |
+| Valid auth, profile `invited` | Success | Denied — not yet activated |
+| Valid auth, profile `deactivated` | Success | Denied — not active |
+| Valid auth, active profile, no role | Success | Denied — friendly role error |
+| Valid auth, active profile, valid role | Success | Granted |
+
+### Provisioning (Admin only)
+
+1. Admin creates a profile in User Management (assigns `role_id`, `status`)
+2. Admin links `auth_user_id` when the user registers or is invited in Supabase Auth
+3. User logs in — profile gate passes — CRM access granted
+
+**Never**: auto-create profile at login, default role assignment, or self-registration.
+
+---
+
+## 18. MVP Permission Matrix (Application)
+
+MVP enforces role capabilities in **application code**, not database tables.
+
+### Location (planned)
+
+```
+src/features/auth/config/permissionMatrix.js
+```
+
+### Capability keys (MVP)
+
+Coarse capabilities derived from domain model and OD-01 / OD-05:
+
+| Capability | Description |
+|------------|-------------|
+| `lead:create` | Create leads (OD-01) |
+| `lead:read_own` | Read own leads |
+| `lead:read_team` | Read team leads (Manager) |
+| `lead:read_all` | Read all leads (CEO, Admin) |
+| `lead:update_own` | Update own leads |
+| `lead:update_team` | Update team leads (OD-05) |
+| `lead:update_all` | Update any lead (Admin) |
+| `lead:reassign` | Reassign leads (Manager, Admin) |
+| `lead:archive` | Set lead outcome |
+| `user:manage` | Create/update/deactivate profiles (Admin) |
+| `trash:read` | View trash |
+| `trash:restore` | Restore from trash (Admin) |
+| `trash:permanent_delete` | Permanent delete (Admin) |
+| `report:read` | View own reports |
+| `report:read_all` | View all reports (CEO, Admin) |
+| `report:export` | Export reports |
+| `auditlog:read` | View audit logs (CEO, Admin) |
+| `settings:read` | View settings |
+| `settings:update` | Update settings (Admin) |
+
+### Role → Capability Matrix
+
+| Capability | CEO | Admin | Manager | BDE | Marketing | Recruiter |
+|------------|:---:|:-----:|:-------:|:---:|:---------:|:---------:|
+| `lead:create` | | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `lead:read_own` | | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `lead:read_team` | | ✓ | ✓ | | | |
+| `lead:read_all` | ✓ | ✓ | | | | |
+| `lead:update_own` | | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `lead:update_team` | | ✓ | ✓ | | | |
+| `lead:update_all` | | ✓ | | | | |
+| `lead:reassign` | | ✓ | ✓ | | | |
+| `lead:archive` | | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `user:manage` | | ✓ | | | | |
+| `trash:read` | | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `trash:restore` | | ✓ | | | | |
+| `trash:permanent_delete` | | ✓ | | | | |
+| `report:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `report:read_all` | ✓ | ✓ | | | | |
+| `report:export` | ✓ | ✓ | | | | |
+| `auditlog:read` | ✓ | ✓ | | | | |
+| `settings:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `settings:update` | | ✓ | | | | |
+
+### V2 Migration Path
+
+When fine-grained permissions are needed:
+
+1. Add `permissions` and `role_permissions` tables
+2. Seed from this matrix
+3. Replace `auth.has_capability()` internals with DB lookups
+4. Keep application matrix as fallback during transition
+
+---
+
 ## Approval Checklist
 
 - [ ] Logical model maps all domain entities
+- [ ] Auth identity separated from business identity (`profile_id` / `auth_user_id`)
+- [ ] No auto-create profile at login; Admin provisioning documented
+- [ ] MVP permissions in application code; V2 DB permissions deferred
 - [ ] Physical model supports OD-01 through OD-07
+- [ ] Business tables reference `profiles.profile_id`
 - [ ] Soft delete and archive strategies clear
 - [ ] RLS matrix approved
+- [ ] Login → profile gate → dashboard flow approved
 - [ ] Migration and seed phases acceptable
 - [ ] Timeline remains derived (no table)
-- [ ] Ready for migration implementation (post-approval)
+- [ ] Ready for identity milestone implementation (post-approval)

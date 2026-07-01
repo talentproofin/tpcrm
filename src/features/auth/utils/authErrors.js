@@ -8,6 +8,10 @@ import { AUTH_ERROR_CODES } from "../constants/errors";
 export function mapAuthErrorCode(error) {
   if (!error) return AUTH_ERROR_CODES.UNKNOWN;
 
+  if ("code" in error && typeof error.code === "string") {
+    return error.code;
+  }
+
   const message = error.message?.toLowerCase() ?? "";
 
   if (message.includes("invalid login credentials")) {
@@ -30,7 +34,7 @@ export function mapAuthErrorCode(error) {
 }
 
 /**
- * Returns a user-safe error message for display in UI (Part 2+).
+ * Returns a user-safe error message for display in UI.
  * @param {string} code
  * @returns {string}
  */
@@ -46,6 +50,10 @@ export function getAuthErrorMessage(code) {
       return "Your session has expired. Please sign in again.";
     case AUTH_ERROR_CODES.SESSION_MISSING:
       return "You must be signed in to continue.";
+    case AUTH_ERROR_CODES.PROFILE_NOT_ACTIVATED:
+      return "Your account has not been activated. Please contact your administrator.";
+    case AUTH_ERROR_CODES.ROLE_MISSING:
+      return "Your account role could not be determined. Please contact an administrator.";
     default:
       return "Something went wrong. Please try again.";
   }

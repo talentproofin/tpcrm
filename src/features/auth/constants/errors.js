@@ -7,5 +7,7 @@ export const AUTH_ERROR_CODES = {
   USER_NOT_FOUND: "user_not_found",
   SESSION_EXPIRED: "session_expired",
   SESSION_MISSING: "session_missing",
+  PROFILE_NOT_ACTIVATED: "profile_not_activated",
+  ROLE_MISSING: "role_missing",
   UNKNOWN: "unknown",
 };

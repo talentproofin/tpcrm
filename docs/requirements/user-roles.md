@@ -26,9 +26,14 @@ CEO cannot create Leads by default.
 
 ## Permission Matrix
 
-Defined in [Persistence Design — RLS](../persistence/persistence-design.md#12-row-level-security).
+Defined in [Persistence Design — MVP Permission Matrix](../persistence/persistence-design.md#18-mvp-permission-matrix-application).
 
-## Authentication
+MVP uses an application-level capability matrix by role code. Fine-grained database permissions are deferred to V2.
 
-- All Users authenticate via Supabase Email & Password
-- Role assignment via `profiles.role_id` (M6+)
+## Authentication & Identity
+
+- All users authenticate via Supabase Email & Password
+- CRM business identity lives in `profiles` (`profile_id`, `auth_user_id`)
+- Profiles are **admin-provisioned only** — never auto-created at login
+- Role assignment via `profiles.role_id` (Admin only)
+- Login flow: Auth → load profile → access denied if no active profile
