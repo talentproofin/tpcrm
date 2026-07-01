@@ -116,6 +116,15 @@ export function getDemoStatuses(supabase, options) {
  * @param {{ activeOnly?: boolean }} [options]
  * @returns {Promise<LookupItem[]>}
  */
+export function getDemoOutcomes(supabase, options) {
+  return getLookups(supabase, LOOKUP_TABLES.DEMO_OUTCOMES, options);
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {{ activeOnly?: boolean }} [options]
+ * @returns {Promise<LookupItem[]>}
+ */
 export function getTaskStatuses(supabase, options) {
   return getLookups(supabase, LOOKUP_TABLES.TASK_STATUSES, options);
 }
@@ -142,6 +151,7 @@ export async function getAllLookups(supabase, options = {}) {
     activityTypes,
     activityOutcomes,
     demoStatuses,
+    demoOutcomes,
     taskStatuses,
     followupStatuses,
   ] = await Promise.all([
@@ -151,6 +161,7 @@ export async function getAllLookups(supabase, options = {}) {
     getActivityTypes(supabase, options),
     getActivityOutcomes(supabase, options),
     getDemoStatuses(supabase, options),
+    getDemoOutcomes(supabase, options),
     getTaskStatuses(supabase, options),
     getFollowupStatuses(supabase, options),
   ]);
@@ -162,6 +173,7 @@ export async function getAllLookups(supabase, options = {}) {
     activityTypes,
     activityOutcomes,
     demoStatuses,
+    demoOutcomes,
     taskStatuses,
     followupStatuses,
   };

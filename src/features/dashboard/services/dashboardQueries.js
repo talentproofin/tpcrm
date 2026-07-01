@@ -1,5 +1,6 @@
 import { classifyFollowUpBucket } from "@/features/followups/utils/followUpBuckets";
-import { startOfDay, endOfDay } from "@/features/followups/utils/followUpBuckets";
+import { startOfDay, endOfDay, isToday } from "@/features/followups/utils/followUpBuckets";
+import { DEMO_STATUS_CODES, DEMO_OUTCOME_CODES } from "@/features/demos/constants";
 
 /**
  * @returns {{ start: string, end: string }}
@@ -351,5 +352,97 @@ export function countActivitiesByOutcome(activities, outcomeCode) {
   return activities.filter((row) => {
     const outcome = row.activity_outcomes;
     return outcome && !Array.isArray(outcome) && outcome.code === outcomeCode;
+  }).length;
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {DashboardScope} scope
+ * @returns {Promise<Record<string, unknown>[]>}
+ */
+export async function fetchDemos(supabase, scope) {
+  let query = supabase
+    .from("demos")
+    .select(
+      `id, scheduled_at, completed_at, presenter_profile_id,
+      demo_statuses(code, name),
+      demo_outcomes(code, name),
+      leads!inner(deleted_at)`
+    )
+    .is("leads.deleted_at", null);
+
+  if (scope.type === "self") {
+    query = query.eq("presenter_profile_id", scope.profileId);
+  } else if (scope.type === "team") {
+    if (scope.profileIds.length === 0) {
+      return [];
+    }
+
+    query = query.in("presenter_profile_id", scope.profileIds);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error("Unable to load demos.");
+  }
+
+  return data ?? [];
+}
+
+/**
+ * @param {Record<string, unknown>[]} demos
+ * @returns {number}
+ */
+export function countDemosScheduledToday(demos) {
+  return demos.filter((row) => {
+    const status = row.demo_statuses;
+    const statusCode =
+      status && !Array.isArray(status) ? String(status.code) : "";
+
+    return (
+      statusCode === DEMO_STATUS_CODES.SCHEDULED &&
+      isToday(String(row.scheduled_at))
+    );
+  }).length;
+}
+
+/**
+ * @param {Record<string, unknown>[]} demos
+ * @returns {number}
+ */
+export function countDemosCompletedToday(demos) {
+  return demos.filter((row) => {
+    const status = row.demo_statuses;
+    const statusCode =
+      status && !Array.isArray(status) ? String(status.code) : "";
+
+    return (
+      statusCode === DEMO_STATUS_CODES.COMPLETED &&
+      row.completed_at &&
+      isToday(String(row.completed_at))
+    );
+  }).length;
+}
+
+/**
+ * @param {Record<string, unknown>[]} demos
+ * @returns {number}
+ */
+export function countPositiveDemoOutcomes(demos) {
+  return demos.filter((row) => {
+    const status = row.demo_statuses;
+    const outcome = row.demo_outcomes;
+    const statusCode =
+      status && !Array.isArray(status) ? String(status.code) : "";
+    const outcomeCode =
+      outcome && !Array.isArray(outcome) ? String(outcome.code) : "";
+
+    return (
+      statusCode === DEMO_STATUS_CODES.COMPLETED &&
+      outcomeCode === DEMO_OUTCOME_CODES.POSITIVE &&
+      row.completed_at &&
+      isToday(String(row.completed_at))
+    );
   }).length;
 }

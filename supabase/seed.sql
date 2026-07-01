@@ -190,6 +190,17 @@ ON CONFLICT (code) DO UPDATE SET
   is_active = true,
   updated_at = now();
 
+INSERT INTO public.demo_outcomes (code, name, display_order) VALUES
+  ('positive', 'Positive', 1),
+  ('follow_up_required', 'Follow-up Required', 2),
+  ('not_interested', 'Not Interested', 3),
+  ('decision_pending', 'Decision Pending', 4)
+ON CONFLICT (code) DO UPDATE SET
+  name = EXCLUDED.name,
+  display_order = EXCLUDED.display_order,
+  is_active = true,
+  updated_at = now();
+
 INSERT INTO public.task_statuses (code, name, display_order) VALUES
   ('pending', 'Pending', 1),
   ('in_progress', 'In Progress', 2),

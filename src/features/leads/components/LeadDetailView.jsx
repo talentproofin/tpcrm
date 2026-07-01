@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { Pencil, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ActivityPanel } from "@/features/activities/components/ActivityPanel";
+import { ContactPanel } from "@/features/contacts/components/ContactPanel";
+import { DemoPanel } from "@/features/demos/components/DemoPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +51,7 @@ export function LeadDetailView({ leadId }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
+  const [leadRefreshKey, setLeadRefreshKey] = useState(0);
 
   const loadLead = useCallback(async () => {
     setLoading(true);
@@ -69,7 +72,7 @@ export function LeadDetailView({ leadId }) {
 
   useEffect(() => {
     loadLead();
-  }, [loadLead]);
+  }, [loadLead, leadRefreshKey]);
 
   async function handleDelete() {
     if (!profile) {
@@ -196,18 +199,16 @@ export function LeadDetailView({ leadId }) {
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <LeadSectionPlaceholder
-          title="Contacts"
-          description="Contact records for this lead will be added in a future milestone."
+        <ContactPanel
+          leadId={leadId}
+          disabled={isTrashed}
+          onContactsChanged={() => setLeadRefreshKey((value) => value + 1)}
         />
         <LeadSectionPlaceholder
           title="Follow-ups"
           description="A dedicated follow-up workspace will be added in a future milestone. Next follow-ups are recorded on each activity."
         />
-        <LeadSectionPlaceholder
-          title="Demos"
-          description="Demo scheduling and tracking will be added in a future milestone."
-        />
+        <DemoPanel leadId={leadId} disabled={isTrashed} />
       </div>
 
       <Dialog

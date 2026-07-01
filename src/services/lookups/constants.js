@@ -8,6 +8,7 @@ export const LOOKUP_TABLES = {
   ACTIVITY_TYPES: "activity_types",
   ACTIVITY_OUTCOMES: "activity_outcomes",
   DEMO_STATUSES: "demo_statuses",
+  DEMO_OUTCOMES: "demo_outcomes",
   TASK_STATUSES: "task_statuses",
   FOLLOWUP_STATUSES: "followup_statuses",
 };

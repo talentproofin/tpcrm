@@ -4,6 +4,10 @@ import {
   buildTeamPerformance,
   countActivitiesByOutcome,
   countActivitiesByType,
+  countDemosCompletedToday,
+  countDemosScheduledToday,
+  countPositiveDemoOutcomes,
+  fetchDemos,
   fetchFollowUps,
   fetchPipelineByStage,
   fetchTodayActivities,
@@ -13,38 +17,20 @@ import {
 } from "./dashboardQueries";
 
 /**
- * @param {Record<string, unknown>[]} activities
- * @returns {number}
- */
-function countDemoScheduledToday(activities) {
-  return activities.filter((row) => {
-    const type = row.activity_types;
-    const outcome = row.activity_outcomes;
-
-    return (
-      type &&
-      !Array.isArray(type) &&
-      type.code === "demo" &&
-      outcome &&
-      !Array.isArray(outcome) &&
-      outcome.code === "scheduled"
-    );
-  }).length;
-}
-
-/**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {import('./dashboardQueries').DashboardScope} scope
  */
 async function loadScopedDashboardData(supabase, scope) {
-  const [activities, followUps] = await Promise.all([
+  const [activities, followUps, demos] = await Promise.all([
     fetchTodayActivities(supabase, scope),
     fetchFollowUps(supabase, scope),
+    fetchDemos(supabase, scope),
   ]);
 
   return {
     activities,
     followUps,
+    demos,
     followUpSummary: summarizeFollowUpBuckets(followUps),
   };
 }
@@ -53,7 +39,7 @@ export const getCeoDashboard = createService({
   name: "getCeoDashboard",
   execute: async (supabase) => {
     const scope = { type: "all" };
-    const { activities, followUps, followUpSummary } =
+    const { activities, followUps, demos, followUpSummary } =
       await loadScopedDashboardData(supabase, scope);
 
     const metrics = [
@@ -82,9 +68,21 @@ export const getCeoDashboard = createService({
         href: DASHBOARD_LINKS.leads,
       },
       {
-        id: "demo_scheduled",
-        label: "Demo Scheduled",
-        value: countDemoScheduledToday(activities),
+        id: "demo_scheduled_today",
+        label: "Demo Scheduled Today",
+        value: countDemosScheduledToday(demos),
+        href: DASHBOARD_LINKS.leads,
+      },
+      {
+        id: "demo_completed_today",
+        label: "Demo Completed Today",
+        value: countDemosCompletedToday(demos),
+        href: DASHBOARD_LINKS.leads,
+      },
+      {
+        id: "positive_demo_outcomes",
+        label: "Positive Demo Outcomes",
+        value: countPositiveDemoOutcomes(demos),
         href: DASHBOARD_LINKS.leads,
       },
       {
@@ -126,7 +124,7 @@ export const getManagerDashboard = createService({
   execute: async (supabase, managerProfileId) => {
     const teamProfileIds = await getTeamProfileIds(supabase, managerProfileId);
     const scope = { type: "team", profileIds: teamProfileIds };
-    const { activities, followUps, followUpSummary } =
+    const { activities, followUps, demos, followUpSummary } =
       await loadScopedDashboardData(supabase, scope);
 
     return {
@@ -162,9 +160,21 @@ export const getManagerDashboard = createService({
           href: DASHBOARD_LINKS.leads,
         },
         {
-          id: "team_demos",
-          label: "Team Demos",
-          value: countDemoScheduledToday(activities),
+          id: "team_demos_scheduled_today",
+          label: "Demo Scheduled Today",
+          value: countDemosScheduledToday(demos),
+          href: DASHBOARD_LINKS.leads,
+        },
+        {
+          id: "team_demos_completed_today",
+          label: "Demo Completed Today",
+          value: countDemosCompletedToday(demos),
+          href: DASHBOARD_LINKS.leads,
+        },
+        {
+          id: "team_positive_demo_outcomes",
+          label: "Positive Demo Outcomes",
+          value: countPositiveDemoOutcomes(demos),
           href: DASHBOARD_LINKS.leads,
         },
       ],
@@ -176,10 +186,8 @@ export const getExecutiveDashboard = createService({
   name: "getExecutiveDashboard",
   execute: async (supabase, profileId) => {
     const scope = { type: "self", profileId };
-    const { activities, followUpSummary } = await loadScopedDashboardData(
-      supabase,
-      scope
-    );
+    const { activities, followUps, demos, followUpSummary } =
+      await loadScopedDashboardData(supabase, scope);
 
     return {
       metrics: [
@@ -211,6 +219,24 @@ export const getExecutiveDashboard = createService({
           id: "my_interested",
           label: "My Interested",
           value: countActivitiesByOutcome(activities, "interested"),
+          href: DASHBOARD_LINKS.leads,
+        },
+        {
+          id: "my_demos_scheduled_today",
+          label: "Demo Scheduled Today",
+          value: countDemosScheduledToday(demos),
+          href: DASHBOARD_LINKS.leads,
+        },
+        {
+          id: "my_demos_completed_today",
+          label: "Demo Completed Today",
+          value: countDemosCompletedToday(demos),
+          href: DASHBOARD_LINKS.leads,
+        },
+        {
+          id: "my_positive_demo_outcomes",
+          label: "Positive Demo Outcomes",
+          value: countPositiveDemoOutcomes(demos),
           href: DASHBOARD_LINKS.leads,
         },
         {
