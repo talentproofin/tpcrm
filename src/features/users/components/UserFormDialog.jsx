@@ -36,9 +36,10 @@ import {
   createDialogOpenChangeHandler,
   preventDialogDismissWhenBusy,
 } from "@/utils/dialogGuards";
-import { USER_STATUS_OPTIONS } from "../constants";
+import { USER_STATUS_CODES, USER_STATUS_OPTIONS } from "../constants";
 import { getManagerCandidates, updateUser } from "../services/userService";
 import {
+  getAllowedStatusTransitions,
   userCreateDefaultValues,
   userCreateSchema,
   userUpdateDefaultValues,
@@ -74,6 +75,20 @@ export function UserFormDialog({
   });
 
   const isSubmitting = form.formState.isSubmitting;
+  const isEditingSelf = !isCreate && user?.profileId === profile?.profileId;
+  const statusOptions = USER_STATUS_OPTIONS.filter((option) => {
+    if (isCreate) {
+      return false;
+    }
+
+    if (isEditingSelf) {
+      return option.value === USER_STATUS_CODES.ACTIVE;
+    }
+
+    return getAllowedStatusTransitions(user?.status ?? USER_STATUS_CODES.ACTIVE).includes(
+      option.value
+    );
+  });
 
   useEffect(() => {
     if (!open) {
@@ -132,6 +147,21 @@ export function UserFormDialog({
         return;
       }
     } else if (user) {
+      if (isEditingSelf) {
+        if (values.roleId !== user.role?.id) {
+          setFormError("You cannot change your own role.");
+          return;
+        }
+
+        if (
+          values.status === USER_STATUS_CODES.INACTIVE ||
+          values.status === USER_STATUS_CODES.SUSPENDED
+        ) {
+          setFormError("You cannot deactivate or suspend your own account.");
+          return;
+        }
+      }
+
       if (values.managerProfileId === user.profileId) {
         setFormError("A user cannot be assigned as their own manager.");
         return;
@@ -174,7 +204,7 @@ export function UserFormDialog({
           <DialogTitle>{titles[mode]}</DialogTitle>
           <DialogDescription>
             {isCreate
-              ? "A Supabase Auth account and profile will be created. A Supabase invite email is sent automatically."
+              ? "A Supabase invite email will be sent. The new profile starts as Invited and becomes Active after first login."
               : "Email cannot be changed. Update role, manager, or status to control access."}
           </DialogDescription>
         </DialogHeader>
@@ -238,7 +268,7 @@ export function UserFormDialog({
                   <Select
                     value={field.value}
                     onValueChange={field.onChange}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isEditingSelf}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -309,34 +339,36 @@ export function UserFormDialog({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    disabled={isSubmitting}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {USER_STATUS_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {!isCreate ? (
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={isSubmitting || isEditingSelf}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {statusOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : null}
 
             <DialogFooter>
               <Button
@@ -354,7 +386,7 @@ export function UserFormDialog({
                     Saving...
                   </>
                 ) : isCreate ? (
-                  "Create user"
+                  "Invite user"
                 ) : (
                   "Save changes"
                 )}

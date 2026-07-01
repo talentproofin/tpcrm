@@ -4,17 +4,25 @@ import {
   DEFAULT_LOG_LEVEL,
   LOG_LEVELS,
 } from "@/constants/logging";
-import { isValidLogLevel, optionalEnv, requireEnv } from "./validateEnv";
+import { isValidLogLevel, isValidUrl, optionalEnv, requireEnv } from "./validateEnv";
 
 /**
  * Application environment configuration.
  * Supabase vars are validated only when getSupabaseConfig() is called.
  */
 export const env = {
-  appUrl: optionalEnv(
-    process.env[APP_ENV_KEYS.APP_URL],
-    "http://localhost:3000"
-  ),
+  appUrl: (() => {
+    const value = optionalEnv(
+      process.env[APP_ENV_KEYS.APP_URL],
+      "http://localhost:3000"
+    );
+    if (!isValidUrl(value)) {
+      throw new Error(
+        `Invalid ${APP_ENV_KEYS.APP_URL}: must be a valid http or https URL.`
+      );
+    }
+    return value;
+  })(),
   nodeEnv: optionalEnv(process.env[APP_ENV_KEYS.NODE_ENV], "development"),
   logLevel: (() => {
     const level = optionalEnv(
@@ -56,4 +64,3 @@ export function getSupabaseServiceRoleKey() {
   );
 }
 
-export { LOG_LEVELS };

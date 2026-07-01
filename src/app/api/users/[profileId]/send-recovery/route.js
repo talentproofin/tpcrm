@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { toApiErrorMessage } from "@/utils/apiErrors";
 import { requireAdminSession } from "@/features/users/services/requireAdminSession";
+import { recordUserAdminAudit } from "@/features/users/services/userAuditService";
 import {
   getUserAdminClient,
   sendRecoveryEmail,
@@ -32,13 +34,27 @@ export async function POST(request, context) {
     const adminClient = getUserAdminClient();
     await sendRecoveryEmail(adminClient, String(profile.email));
 
+    await recordUserAdminAudit(
+      auth.supabase,
+      auth.profile.profileId,
+      "updated",
+      profileId,
+      {
+        event: "password_recovery_triggered",
+        email: String(profile.email),
+      }
+    );
+
     return NextResponse.json({ success: true });
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Unable to send password recovery email.";
-
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: toApiErrorMessage(
+          error,
+          "Unable to send password recovery email."
+        ),
+      },
+      { status: 400 }
+    );
   }
 }

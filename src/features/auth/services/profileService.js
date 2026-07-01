@@ -114,3 +114,21 @@ export async function updateLastLoginAt(supabase, profileId, authUserId) {
     );
   }
 }
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} profileId
+ * @returns {Promise<void>}
+ */
+export async function activateInvitedProfile(supabase, profileId) {
+  const { error } = await supabase.rpc("activate_invited_profile", {
+    p_profile_id: profileId,
+  });
+
+  if (error) {
+    throw createAuthError(
+      AUTH_ERROR_CODES.UNKNOWN,
+      "Unable to activate your profile. Please try again."
+    );
+  }
+}

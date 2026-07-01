@@ -4,6 +4,7 @@ import {
   getProfileByAuthUserId,
   getRoleById,
 } from "@/features/auth/services/profileService";
+import { USER_STATUS_CODES } from "@/features/users/constants";
 import { canManageUsers } from "@/features/users/constants/permissions";
 
 /**
@@ -32,6 +33,13 @@ export async function requireAdminSession() {
     return {
       ok: false,
       response: NextResponse.json({ error: "Profile not found." }, { status: 403 }),
+    };
+  }
+
+  if (profile.status !== USER_STATUS_CODES.ACTIVE) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: "Forbidden." }, { status: 403 }),
     };
   }
 

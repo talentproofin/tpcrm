@@ -1,4 +1,6 @@
-const VALID_LOG_LEVELS = ["debug", "info", "warn", "error"];
+import { LOG_LEVELS } from "@/constants/logging";
+
+const VALID_LOG_LEVELS = Object.values(LOG_LEVELS);
 
 /**
  * Validates that a required environment variable is present and non-empty.
@@ -27,6 +29,20 @@ export function optionalEnv(value, fallback) {
     return fallback;
   }
   return value;
+}
+
+/**
+ * Validates that a URL string is well-formed.
+ * @param {string} value
+ * @returns {boolean}
+ */
+export function isValidUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 /**

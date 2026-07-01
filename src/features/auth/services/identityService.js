@@ -2,6 +2,7 @@ import { ACCESS_REASONS } from "../constants/access";
 import { AUTH_ERROR_CODES } from "../constants/errors";
 import { createAuthError } from "../utils/createAuthError";
 import {
+  activateInvitedProfile,
   getProfileByAuthUserId,
   getRoleById,
   updateLastLoginAt,
@@ -24,7 +25,7 @@ import {
  * @returns {Promise<IdentityResolution>}
  */
 export async function resolveIdentityAfterLogin(supabase, user, session) {
-  const profile = await getProfileByAuthUserId(supabase, user.id);
+  let profile = await getProfileByAuthUserId(supabase, user.id);
 
   if (!profile) {
     return {
@@ -33,16 +34,21 @@ export async function resolveIdentityAfterLogin(supabase, user, session) {
     };
   }
 
-  if (profile.status === "invited") {
-    return { accessDenied: true, accessReason: ACCESS_REASONS.INVITED };
-  }
-
   if (profile.status === "inactive") {
     return { accessDenied: true, accessReason: ACCESS_REASONS.INACTIVE };
   }
 
   if (profile.status === "suspended") {
     return { accessDenied: true, accessReason: ACCESS_REASONS.SUSPENDED };
+  }
+
+  if (profile.status === "invited") {
+    await activateInvitedProfile(supabase, profile.profileId);
+    profile = {
+      ...profile,
+      status: "active",
+      activatedAt: new Date().toISOString(),
+    };
   }
 
   if (profile.status !== "active") {

@@ -24,6 +24,6 @@ export const USER_MANAGEMENT_ACCESS_ROLE_CODES = ["admin", "ceo", "manager"];
 
 export const USER_MANAGEMENT_WRITE_ROLE_CODES = ["admin"];
 
-export const MANAGER_ASSIGNABLE_ROLE_CODES = ["ceo", "admin", "manager"];
+export const MANAGER_ASSIGNABLE_ROLE_CODES = ["admin", "manager"];
 
 export const DEFAULT_PAGE_SIZE = 20;

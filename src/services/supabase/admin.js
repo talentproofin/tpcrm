@@ -1,3 +1,4 @@
+import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseConfig, getSupabaseServiceRoleKey } from "@/config/env";
 import { logger } from "@/services/logging";

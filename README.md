@@ -1,65 +1,73 @@
-# TalentProof Sales CRM
+# TalentProof Sales CRM (TPCRM)
 
-Internal Sales CRM built for TalentProof.
+Internal Sales CRM for TalentProof.
 
 ## Status
 
-**Milestone 6 complete** — design system documented. **Awaiting approval before Milestone 7 (Authentication).**
-
-## Quality Bar
-
-Production quality. Designed for 5+ years of maintainability.
+**MVP complete** — production readiness audit (Milestone 20B) applied.
 
 ## Tech Stack
 
 - Next.js 15 (App Router)
-- JavaScript
-- Tailwind CSS
-- shadcn/ui
-- ESLint + Prettier
-- Supabase (Milestone 3 ✅)
-- PostgreSQL (Persistence Design M5)
+- JavaScript + JSDoc
+- Tailwind CSS + shadcn/ui
+- Supabase (Auth, PostgreSQL, RLS)
+- Zod validation
 
 ## Getting Started
 
 ```bash
 npm install
-cp .env.example .env.local
+cp .env.example .env.local   # configure Supabase keys
+npm run verify:env
 npm run dev
-npm run build
+```
+
+## Quality Commands
+
+```bash
 npm run lint
+npm run build
 npm run verify:infra
+npm run verify:env
 ```
 
 ## Project Structure
 
 ```
 src/
-├── app/              # Next.js routes
-├── components/       # Generic reusable UI + shadcn/ui
-├── features/         # Independent feature modules
-├── hooks/            # Shared hooks
-├── services/         # Shared infrastructure (Supabase in M3)
-├── utils/            # Shared utilities (cn.js)
+├── app/              # Routes (dashboard, auth, API)
+├── components/       # Shared UI
+├── features/         # Feature modules
+├── services/         # Infrastructure (Supabase, logging)
+├── config/           # Environment configuration
 ├── constants/        # Global constants
-├── types/            # Shared JSDoc types
-├── config/           # App configuration
-└── middleware/       # Route middleware (M6+)
+├── utils/            # Shared utilities
+└── middleware.js     # Auth session + route protection
 ```
-
-**No `src/lib/`** — helpers live in `utils/`, `services/`, `config/`, or `types/`.
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [Standards](./docs/standards/project-standards.md) | Architecture, naming, coding |
-| [Domain Model](./docs/domain/domain-model.md) | Business entities, rules, Timeline view |
-| [Design System](./docs/design-system/design-system.md) | UI foundation (M6) |
-| [Persistence Design](./docs/persistence/persistence-design.md) | PostgreSQL design |
-| [Roadmap](./docs/roadmap.md) | 20-milestone plan |
-| [ADR](./docs/adr/README.md) | Architecture Decision Records |
+| [Deployment Guide](./docs/deployment/README.md) | Production deployment |
+| [Environment Variables](./docs/deployment/environment-variables.md) | Configuration |
+| [Production Checklist](./docs/deployment/production-checklist.md) | Pre-launch checklist |
+| [Manual QA](./docs/deployment/manual-qa-checklist.md) | Full regression checklist |
+| [Architecture](./docs/deployment/architecture-diagram.md) | System diagram |
+| [Database](./docs/deployment/database-diagram.md) | Schema diagram |
+| [Technical Debt](./docs/deployment/technical-debt.md) | Known follow-ups |
+| [Domain Model](./docs/domain/domain-model.md) | Business entities |
+| [Persistence](./docs/persistence/persistence-design.md) | Database design |
+| [Standards](./docs/standards/project-standards.md) | Coding standards |
 
 ## Path Aliases
 
-`@/*` → `src/*` | shadcn `utils` → `@/utils/cn`
+`@/*` → `src/*`
+
+## Security
+
+- Row Level Security on all application tables
+- Service role key server-only (`server-only` guard on admin client)
+- Middleware enforces authentication on protected routes
+- Admin API routes require active admin session

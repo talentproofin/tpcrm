@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { toApiErrorMessage } from "@/utils/apiErrors";
 import { requireAdminSession } from "@/features/users/services/requireAdminSession";
+import { recordUserAdminAudit } from "@/features/users/services/userAuditService";
 import {
   getUserAdminClient,
   resendInviteEmail,
@@ -32,11 +34,24 @@ export async function POST(request, context) {
     const adminClient = getUserAdminClient();
     await resendInviteEmail(adminClient, String(profile.email));
 
+    await recordUserAdminAudit(
+      auth.supabase,
+      auth.profile.profileId,
+      "updated",
+      profileId,
+      {
+        event: "invite_email_resent",
+        email: String(profile.email),
+      }
+    );
+
     return NextResponse.json({ success: true });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unable to resend invite email.";
-
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: toApiErrorMessage(error, "Unable to resend invite email."),
+      },
+      { status: 400 }
+    );
   }
 }

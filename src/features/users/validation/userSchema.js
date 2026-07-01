@@ -36,7 +36,6 @@ export const userCreateSchema = z.object({
   roleId: z.string().uuid("Select a role."),
   managerProfileId: managerProfileIdSchema,
   phone: optionalText(50, "Phone"),
-  status: userStatusSchema,
 });
 
 export const userUpdateSchema = z.object({
@@ -58,7 +57,6 @@ export const userCreateDefaultValues = {
   roleId: "",
   managerProfileId: "",
   phone: "",
-  status: USER_STATUS_CODES.ACTIVE,
 };
 
 /** @type {import('zod').infer<typeof userUpdateSchema>} */
@@ -69,3 +67,30 @@ export const userUpdateDefaultValues = {
   phone: "",
   status: USER_STATUS_CODES.ACTIVE,
 };
+
+/**
+ * @param {import('../types/user').UserStatus} currentStatus
+ * @returns {import('../types/user').UserStatus[]}
+ */
+export function getAllowedStatusTransitions(currentStatus) {
+  switch (currentStatus) {
+    case USER_STATUS_CODES.INVITED:
+      return [
+        USER_STATUS_CODES.INVITED,
+        USER_STATUS_CODES.ACTIVE,
+        USER_STATUS_CODES.INACTIVE,
+        USER_STATUS_CODES.SUSPENDED,
+      ];
+    case USER_STATUS_CODES.ACTIVE:
+      return [
+        USER_STATUS_CODES.ACTIVE,
+        USER_STATUS_CODES.INACTIVE,
+        USER_STATUS_CODES.SUSPENDED,
+      ];
+    case USER_STATUS_CODES.INACTIVE:
+    case USER_STATUS_CODES.SUSPENDED:
+      return [currentStatus, USER_STATUS_CODES.ACTIVE];
+    default:
+      return [USER_STATUS_CODES.ACTIVE];
+  }
+}

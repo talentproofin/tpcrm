@@ -11,6 +11,8 @@ import { FOLLOWUP_ROUTES } from "@/features/followups/constants/routes";
 import { LEAD_ROUTES } from "@/features/leads/constants/routes";
 import { REPORT_ROUTES } from "@/features/reports/constants/routes";
 import { canAccessDailyReport } from "@/features/reports/constants/roles";
+import { canAccessSettings } from "@/features/settings/constants/permissions";
+import { SETTINGS_ROUTES } from "@/features/settings/constants/routes";
 
 export function DashboardNav() {
   const { profile } = useCurrentProfile();
@@ -70,6 +72,14 @@ export function DashboardNav() {
           className="transition-colors hover:text-foreground"
         >
           Users
+        </Link>
+      ) : null}
+      {canAccessSettings(roleCode) ? (
+        <Link
+          href={SETTINGS_ROUTES.ORGANIZATION}
+          className="transition-colors hover:text-foreground"
+        >
+          Settings
         </Link>
       ) : null}
     </nav>

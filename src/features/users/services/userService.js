@@ -1,5 +1,9 @@
 import { createService } from "@/services/infrastructure/createService";
-import { DEFAULT_PAGE_SIZE, USER_ERROR_CODES } from "../constants";
+import {
+  DEFAULT_PAGE_SIZE,
+  MANAGER_ASSIGNABLE_ROLE_CODES,
+  USER_ERROR_CODES,
+} from "../constants";
 import { MANAGED_USER_SELECT, mapManagedUserRow } from "./userMapper";
 
 /**
@@ -29,6 +33,9 @@ function mapDatabaseError(error) {
     message.includes("cannot be assigned as their own manager") ||
     message.includes("Invalid manager assignment") ||
     message.includes("Invalid role assignment") ||
+    message.includes("Invalid status transition") ||
+    message.includes("cannot change your own role") ||
+    message.includes("cannot deactivate or suspend your own account") ||
     message.includes("Role is required") ||
     message.includes("Email is required")
   ) {
@@ -192,7 +199,7 @@ export const getManagerCandidates = createService({
         const role = row.roles;
         const code =
           role && !Array.isArray(role) ? String(role.code) : "";
-        return ["ceo", "admin", "manager"].includes(code);
+        return MANAGER_ASSIGNABLE_ROLE_CODES.includes(code);
       })
       .map((row) => ({
         profileId: String(row.profile_id),

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { toApiErrorMessage } from "@/utils/apiErrors";
 import { userCreateSchema } from "@/features/users/validation";
 import { requireAdminSession } from "@/features/users/services/requireAdminSession";
 import {
@@ -48,17 +49,20 @@ export async function POST(request) {
         p_full_name: input.fullName,
         p_email: input.email,
         p_role_id: input.roleId,
-        p_manager_profile_id: input.managerProfileId || null,
-        p_phone: input.phone || null,
-        p_status: input.status,
-        p_created_by_profile_id: auth.profile.profileId,
+      p_manager_profile_id: input.managerProfileId || null,
+      p_phone: input.phone || null,
+      p_status: "invited",
+      p_created_by_profile_id: auth.profile.profileId,
       }
     );
 
     if (profileError) {
       await adminClient.auth.admin.deleteUser(authUserId);
 
-      return NextResponse.json({ error: profileError.message }, { status: 400 });
+      return NextResponse.json(
+        { error: "Unable to create user profile." },
+        { status: 400 }
+      );
     }
 
     return NextResponse.json({ profileId }, { status: 201 });
@@ -67,19 +71,11 @@ export async function POST(request) {
       await adminClient.auth.admin.deleteUser(authUserId);
     }
 
-    const message =
-      error instanceof Error ? error.message : "Unable to create user.";
-
-    if (
-      message.includes("already been registered") ||
-      message.includes("already exists")
-    ) {
-      return NextResponse.json(
-        { error: "A user with this email already exists." },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: toApiErrorMessage(error, "Unable to create user."),
+      },
+      { status: 400 }
+    );
   }
 }
